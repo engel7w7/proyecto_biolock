@@ -6,6 +6,7 @@ import '../services/camera_service.dart';
 import '../services/face_detection_service.dart';
 import '../services/bluetooth_service.dart';
 import '../services/auth_service.dart';
+import '../utils/str_constants.dart'; // Para manejo de STR
 import '../widgets/camera_preview_widget.dart';
 
 class UnlockScreen extends StatefulWidget {
@@ -155,7 +156,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
 
               if (mounted) {
                 setState(() {
-                  _statusMessage = 'Acerca tu rostro a la cámara...';
+                  _statusMessage = 'Acerca tu rostro a la camara...';
                   _statusColor = Colors.blue;
                 });
               }
@@ -164,13 +165,35 @@ class _UnlockScreenState extends State<UnlockScreen> {
         } else {
           if (mounted && _statusColor != Colors.blue) {
             setState(() {
-              _statusMessage = 'Acerca tu rostro a la cámara...';
+              _statusMessage = 'Acerca tu rostro a la camara...';
               _statusColor = Colors.blue;
             });
           }
         }
       } catch (e) {
-        print('Error: $e');
+        // === GESTIÓN DE EXCEPCIONES STR ===
+        if (e.toString().contains('STR_DEADLINE_MISS')) {
+          print('DEADLINE MISS CAPTURADO: Abortando acceso por latencia.');
+          if (mounted) {
+            setState(() {
+              _statusMessage = 'Fallo STR: Tiempo Excedido';
+              _statusColor = Colors.orange; // Color de alerta tecnica
+            });
+          }
+          
+          // Por seguridad (STR Critico), mandamos comando de rechazo (Buzzer)
+          await _bluetoothService.rejectAccess(); 
+          await Future.delayed(const Duration(seconds: 2));
+          
+          if (mounted) {
+            setState(() {
+              _statusMessage = 'Acerca tu rostro a la camara...';
+              _statusColor = Colors.blue;
+            });
+          }
+        } else {
+          print('Error: $e');
+        }
       } finally {
         _isProcessing = false;
       }

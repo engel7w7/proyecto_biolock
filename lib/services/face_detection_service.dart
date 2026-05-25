@@ -4,7 +4,9 @@ import 'package:logger/logger.dart';
 import 'dart:typed_data';
 import 'dart:ui' show Size;
 import 'dart:math'; // Requerido para operaciones matemáticas de raíz cuadrada
+import 'dart:async'; // Necesario para TimeoutException y timeout
 import '../models/app_state.dart';
+import '../utils/str_constants.dart'; // Importa deadlines STR
 import 'database_service.dart'; // Importación requerida para guardar métricas STR
 
 class FaceDetectionService {
@@ -35,16 +37,18 @@ class FaceDetectionService {
 
   /// Detecta rostros en una imagen e instrumenta T-DET
   Future<List<Face>> detectFaces(CameraImage image) async {
+    late final Stopwatch stopwatch;
+    
     try {
       if (!_isInitialized) {
-        _logger.w('⚠ FaceDetector no inicializado');
+        _logger.w('FaceDetector no inicializado');
         return [];
       }
 
       _frameCount++;
       
       // === INSTRUMENTACIÓN STR: INICIO MEDICIÓN T-DET ===
-      final stopwatch = Stopwatch()..start();
+      stopwatch = Stopwatch()..start();
       
       final planes = image.planes;
       final int width = image.width;
@@ -97,7 +101,10 @@ class FaceDetectionService {
         ),
       );
       
-      final List<Face> faces = await _faceDetector.processImage(inputImage);
+      final List<Face> faces = await _faceDetector.processImage(inputImage).timeout(
+        const Duration(milliseconds: STRConfig.DEADLINE_T_DET),
+        onTimeout: () => throw TimeoutException('STR_DEADLINE_MISS_DET'),
+      );
       
       stopwatch.stop();
       // === INSTRUMENTACIÓN STR: REGISTRO EN BASE DE DATOS ===
@@ -105,28 +112,38 @@ class FaceDetectionService {
       await DatabaseService().logSTRMetrics(
         'T-DET', 
         stopwatch.elapsedMilliseconds.toDouble(), 
-        100.0
+        STRConfig.DEADLINE_T_DET.toDouble()
       );
       
       if (faces.isNotEmpty) {
         _successfulDetections++;
-        _logger.i('🎉 ¡DETECTADO! Frame $_frameCount | Rostros: ${faces.length}');
+        _logger.i('DETECTADO! Frame $_frameCount | Rostros: ${faces.length}');
       } else if (_frameCount % 30 == 1) {
-        _logger.w('⏳ Frame $_frameCount (NV21 optimal)');
+        _logger.w('Frame $_frameCount (NV21 optimal)');
       }
       
       return faces;
+    } on TimeoutException catch (_) {
+      stopwatch.stop();
+      // Registrar el Deadline Miss
+      await DatabaseService().logSTRMetrics(
+        'T-DET',
+        (STRConfig.DEADLINE_T_DET + 1).toDouble(),
+        STRConfig.DEADLINE_T_DET.toDouble()
+      );
+      _logger.e('FALLO STR: T-DET excedio el plazo de ${STRConfig.DEADLINE_T_DET}ms');
+      throw Exception('STR_DEADLINE_MISS_DET'); // Lanza error para abortar el acceso
     } catch (e) {
-      _logger.e('✗ Error detectando rostros (frame $_frameCount): $e');
+      _logger.e('Error detectando rostros (frame $_frameCount): $e');
       return [];
     }
   }
 
   /// Compara rostros con embeddings e instrumenta T-VAL
-  FaceRecognitionResult compareFaces(
+  Future<FaceRecognitionResult> compareFaces(
     List<Face> detectedFaces,
     Face? enrolledFace,
-  ) {
+  ) async {
     // === INSTRUMENTACIÓN STR: INICIO MEDICIÓN T-VAL ===
     final stopwatch = Stopwatch()..start();
     
@@ -137,7 +154,7 @@ class FaceDetectionService {
           isMatched: false,
           confidence: 0.0,
           timestamp: DateTime.now().toIso8601String(),
-          errorMessage: 'No se detectó rostro',
+          errorMessage: 'No se detecto rostro',
         );
       }
 
@@ -172,15 +189,27 @@ class FaceDetectionService {
       final bool isMatched = confidence >= confidenceThreshold;
 
       stopwatch.stop();
+      
+      // === ENFORZAMIENTO STR (T-VAL = 50ms) ===
+      if (stopwatch.elapsedMilliseconds > STRConfig.DEADLINE_T_VAL) {
+        await DatabaseService().logSTRMetrics(
+          'T-VAL',
+          stopwatch.elapsedMilliseconds.toDouble(),
+          STRConfig.DEADLINE_T_VAL.toDouble()
+        );
+        _logger.e('FALLO STR: T-VAL excedio el plazo de ${STRConfig.DEADLINE_T_VAL}ms');
+        throw Exception('STR_DEADLINE_MISS_VAL');
+      }
+      
       // === INSTRUMENTACIÓN STR: REGISTRO T-VAL ===
       // Código: T-VAL, Deadline Nominal de diseño: 50.0 ms
-      DatabaseService().logSTRMetrics(
+      await DatabaseService().logSTRMetrics(
         'T-VAL', 
         stopwatch.elapsedMilliseconds.toDouble(), 
-        50.0
+        STRConfig.DEADLINE_T_VAL.toDouble()
       );
 
-      _logger.i('Comparación: matched=$isMatched, confidence=${(confidence * 100).toStringAsFixed(1)}%');
+      _logger.i('Comparacion: matched=$isMatched, confidence=${(confidence * 100).toStringAsFixed(1)}%');
 
       return FaceRecognitionResult(
         isMatched: isMatched,
@@ -189,6 +218,7 @@ class FaceDetectionService {
       );
     } catch (e) {
       stopwatch.stop();
+      if (e.toString().contains('STR_DEADLINE_MISS_VAL')) rethrow; // Pasa el error critico arriba
       _logger.e('Error comparando rostros: $e');
       return FaceRecognitionResult(
         isMatched: false,
@@ -266,10 +296,10 @@ class FaceDetectionService {
   }
 
   /// Compara el rostro actual contra el almacenado usando Distancia Euclidiana Real
-  FaceRecognitionResult compareFacesReal(
+  Future<FaceRecognitionResult> compareFacesReal(
     List<double> currentEmbedding, // El vector de 128 datos extraído por MobileFaceNet
     List<double> enrolledEmbedding, // El vector cargado desde tu SQLite
-  ) {
+  ) async {
     // === INSTRUMENTACIÓN STR: INICIO MEDICIÓN T-VAL ===
     final stopwatch = Stopwatch()..start();
 
@@ -280,7 +310,7 @@ class FaceDetectionService {
           isMatched: false,
           confidence: 0.0,
           timestamp: DateTime.now().toIso8601String(),
-          errorMessage: 'Embeddings vacíos',
+          errorMessage: 'Embeddings vacios',
         );
       }
 
@@ -290,7 +320,7 @@ class FaceDetectionService {
           isMatched: false,
           confidence: 0.0,
           timestamp: DateTime.now().toIso8601String(),
-          errorMessage: 'Incompatibilidad de vectores moleculares (${currentEmbedding.length} vs ${enrolledEmbedding.length})',
+          errorMessage: 'Incompatibilidad de vectores (${currentEmbedding.length} vs ${enrolledEmbedding.length})',
         );
       }
 
@@ -307,19 +337,31 @@ class FaceDetectionService {
       const double threshold = 0.6;
       bool isMatched = euclideanDistance < threshold;
 
-      // Normalización matemática para mostrar porcentaje de confianza al docente
+      // Normalización matemática para mostrar porcentaje de confianza
       double confidence = (1.0 - (euclideanDistance / threshold)).clamp(0.0, 1.0);
 
       stopwatch.stop();
+      
+      // === ENFORZAMIENTO STR (T-VAL = 50ms) ===
+      if (stopwatch.elapsedMilliseconds > STRConfig.DEADLINE_T_VAL) {
+        await DatabaseService().logSTRMetrics(
+          'T-VAL',
+          stopwatch.elapsedMilliseconds.toDouble(),
+          STRConfig.DEADLINE_T_VAL.toDouble()
+        );
+        _logger.e('FALLO STR: T-VAL excedio el plazo de ${STRConfig.DEADLINE_T_VAL}ms');
+        throw Exception('STR_DEADLINE_MISS_VAL');
+      }
+      
       // === INSTRUMENTACIÓN STR: REGISTRO T-VAL ===
       // Código: T-VAL, Deadline Nominal de diseño: 50.0 ms
-      DatabaseService().logSTRMetrics(
+      await DatabaseService().logSTRMetrics(
         'T-VAL', 
         stopwatch.elapsedMilliseconds.toDouble(), 
-        50.0
+        STRConfig.DEADLINE_T_VAL.toDouble()
       );
 
-      _logger.i('🔍 Comparación Euclidiana: distancia=$euclideanDistance, matched=$isMatched, confidence=${(confidence * 100).toStringAsFixed(1)}%');
+      _logger.i('Comparacion Euclidiana: distancia=$euclideanDistance, matched=$isMatched, confidence=${(confidence * 100).toStringAsFixed(1)}%');
 
       return FaceRecognitionResult(
         isMatched: isMatched,
@@ -328,7 +370,8 @@ class FaceDetectionService {
       );
     } catch (e) {
       stopwatch.stop();
-      _logger.e('✗ Error en comparación Euclidiana: $e');
+      if (e.toString().contains('STR_DEADLINE_MISS_VAL')) rethrow; // Pasa el error critico arriba
+      _logger.e('Error en comparacion Euclidiana: $e');
       return FaceRecognitionResult(
         isMatched: false,
         confidence: 0.0,

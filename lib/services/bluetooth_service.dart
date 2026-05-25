@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:async'; // Necesario para TimeoutException
 import 'package:logger/logger.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart'; // Librería nativa hardware
 import 'package:permission_handler/permission_handler.dart';
+import '../utils/str_constants.dart'; // Importa deadlines STR
 import 'database_service.dart';
 
 class BluetoothDevice {
@@ -98,7 +100,7 @@ class BluetoothService {
   /// Envía un byte de comando y mide T-BTX con precisión de tiempo real
   Future<bool> sendCommand(String command) async {
     if (!_isConnected || _connection == null || !_connection!.isConnected) {
-      _logger.w('⚠ Error: Tráfico denegado. Sin enlace de hardware activo.');
+      _logger.w('Advertencia: Trafico denegado. Sin enlace de hardware activo.');
       return false;
     }
 
@@ -107,7 +109,12 @@ class BluetoothService {
 
     try {
       _connection!.output.add(utf8.encode(command));
-      await _connection!.output.allSent; // Fuerza el vaciado del búfer de salida serial
+      
+      // === ENFORZAMIENTO STR (T-BTX = 10ms) ===
+      await _connection!.output.allSent.timeout(
+        const Duration(milliseconds: STRConfig.DEADLINE_T_BTX),
+        onTimeout: () => throw TimeoutException('STR_DEADLINE_MISS_BTX'),
+      );
       
       stopwatch.stop();
       // === INSTRUMENTACIÓN STR: REGISTRO T-BTX ===
@@ -115,14 +122,23 @@ class BluetoothService {
       await DatabaseService().logSTRMetrics(
         'T-BTX', 
         stopwatch.elapsedMilliseconds.toDouble(), 
-        10.0
+        STRConfig.DEADLINE_T_BTX.toDouble()
       );
 
-      _logger.i('📤 Stream serial despachado: "$command"');
+      _logger.i('Stream serial despachado: "$command"');
       return true;
+    } on TimeoutException catch (_) {
+      stopwatch.stop();
+      await DatabaseService().logSTRMetrics(
+        'T-BTX',
+        stopwatch.elapsedMilliseconds.toDouble(),
+        STRConfig.DEADLINE_T_BTX.toDouble()
+      );
+      _logger.e('FALLO RED STR: T-BTX supero ${STRConfig.DEADLINE_T_BTX}ms');
+      return false; // Al fallar la red, devolvemos falso
     } catch (e) {
       stopwatch.stop();
-      _logger.e('✗ Error en transmisión de flujo serial: $e');
+      _logger.e('Error en transmisión de flujo serial: $e');
       return false;
     }
   }
