@@ -51,7 +51,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
           setState(() {
             _isInitialized = true;
             _statusMessage = 'Acerca tu rostro a la cámara...';
-            _statusColor = const Color(0xFF00E5FF);
+            _statusColor = const Color(0xFF1F5BA6);
           });
           _startFaceDetection();
         }
@@ -104,7 +104,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
         _startFaceDetection();
       }
     } catch (e) {
-      print('❌ [UnlockScreen] Exception: $e');
+      print('[UnlockScreen] Exception: $e');
       if (mounted) {
         setState(() {
           _cameraFailed = true;
@@ -130,10 +130,11 @@ class _UnlockScreenState extends State<UnlockScreen> {
           if (mounted) {
             if (result.isMatched) {
               setState(() {
-                _statusMessage = '✅ ¡Acceso Concedido!';
+                _statusMessage = 'Acceso Concedido';
                 _statusColor = Colors.green;
               });
 
+              // === COMANDO REAL AL ESP32 ===
               await _bluetoothService.openLock();
 
               await Future.delayed(const Duration(seconds: 2));
@@ -143,9 +144,12 @@ class _UnlockScreenState extends State<UnlockScreen> {
               }
             } else {
               setState(() {
-                _statusMessage = '❌ Rostro no reconocido';
+                _statusMessage = 'Rostro no reconocido';
                 _statusColor = Colors.red;
               });
+
+              // === COMANDO DE RECHAZO AL ESP32 ===
+              await _bluetoothService.rejectAccess();
 
               await Future.delayed(const Duration(seconds: 2));
 

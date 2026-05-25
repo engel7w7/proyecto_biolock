@@ -29,8 +29,9 @@ class DatabaseService {
 
       return await openDatabase(
         path,
-        version: 1,
+        version: 2,
         onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
       );
     } catch (e) {
       print('[DatabaseService] Error inicializando DB: $e');
@@ -79,10 +80,77 @@ class DatabaseService {
         )
       ''');
 
-      print('[DatabaseService] Base de datos creada exitosamente');
+      // === NUEVA TABLA: TELEMETRÍA DE TIEMPO REAL (CAPÍTULO 4 - PRODUCCIÓN) ===
+      await db.execute('''
+        CREATE TABLE str_telemetry_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_code TEXT NOT NULL,
+          timestamp TEXT NOT NULL,
+          execution_time_ms REAL NOT NULL,
+          deadline_ms REAL NOT NULL,
+          alert_flag INTEGER NOT NULL
+        )
+      ''');
+
+      print('[DatabaseService] Base de datos creada exitosamente con soporte STR');
     } catch (e) {
       print('[DatabaseService] Error creando tablas: $e');
       rethrow;
+    }
+  }
+
+  /// Migración de la base de datos de v1 a v2
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    try {
+      print('[DatabaseService] Migrando de v$oldVersion a v$newVersion');
+      
+      if (oldVersion < 2) {
+        // Agregar tabla de telemetría STR si no existe
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS str_telemetry_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_code TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            execution_time_ms REAL NOT NULL,
+            deadline_ms REAL NOT NULL,
+            alert_flag INTEGER NOT NULL
+          )
+        ''');
+        print('[DatabaseService] Tabla str_telemetry_logs creada/verificada');
+      }
+    } catch (e) {
+      print('[DatabaseService] Error migrando DB: $e');
+    }
+  }
+
+  // === NUEVO MÉTODO: INSERCIÓN SÍNCRONA DE MÉTRICAS STR ===
+  Future<void> logSTRMetrics(String taskCode, double executionTimeMs, double deadlineMs) async {
+    try {
+      final db = await database;
+      // Si el tiempo real medido supera el plazo (Deadline), se activa la Alerta (1)
+      int alertFlag = (executionTimeMs > deadlineMs) ? 1 : 0;
+
+      await db.insert('str_telemetry_logs', {
+        'task_code': taskCode,
+        'timestamp': DateTime.now().toIso8601String(),
+        'execution_time_ms': executionTimeMs,
+        'deadline_ms': deadlineMs,
+        'alert_flag': alertFlag,
+      });
+      _logger.d('[STR Telemetry] Log insertado para $taskCode: ${executionTimeMs}ms (Alert: $alertFlag)');
+    } catch (e) {
+      print('[DatabaseService] Error insertando telemetría STR: $e');
+    }
+  }
+
+  /// Obtiene todos los logs de telemetría STR (Para mostrar en pantallas de control)
+  Future<List<Map<String, dynamic>>> getSTRTelemetryLogs() async {
+    try {
+      final db = await database;
+      return await db.query('str_telemetry_logs', orderBy: 'id DESC');
+    } catch (e) {
+      print('[DatabaseService] Error obteniendo telemetría STR: $e');
+      return [];
     }
   }
 
@@ -228,6 +296,7 @@ class DatabaseService {
       final db = await database;
       await db.delete('sessions');
       await db.delete('access_logs');
+      await db.delete('str_telemetry_logs'); // Limpiar telemetría también
       await db.delete('users');
       print('[DatabaseService] Base de datos limpiada');
     } catch (e) {

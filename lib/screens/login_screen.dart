@@ -79,8 +79,8 @@ class _LoginScreenState extends State<LoginScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF0A0E1A),
-              Color(0xFF1A1F3A),
+              Color(0xFF0F1419),
+              Color(0xFF1A1F2E),
             ],
           ),
         ),
@@ -96,14 +96,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: const Color(0xFF00E5FF),
+                      color: const Color(0xFF1F5BA6),
                       width: 3,
                     ),
                   ),
                   child: const Icon(
                     Icons.security_outlined,
                     size: 64,
-                    color: Color(0xFF00E5FF),
+                    color: Color(0xFF1F5BA6),
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -112,18 +112,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Text(
                   'BioLock',
                   style: TextStyle(
-                    color: Color(0xFF00E5FF),
+                    color: Color(0xFFFFFFFF),
                     fontSize: 32,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                     letterSpacing: 2,
                   ),
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Acceso Seguro',
+                  'Acceso Seguro y Biométrico',
                   style: TextStyle(
-                    color: Colors.white54,
+                    color: Color(0xFFB0B0B0),
                     fontSize: 14,
+                    fontWeight: FontWeight.w400,
                   ),
                 ),
                 const SizedBox(height: 48),
@@ -133,27 +134,28 @@ class _LoginScreenState extends State<LoginScreen> {
                   controller: _usernameController,
                   decoration: InputDecoration(
                     hintText: 'Usuario',
-                    prefixIcon: const Icon(Icons.person_outline),
+                    hintStyle: const TextStyle(color: Color(0xFF808080)),
+                    prefixIcon: const Icon(Icons.person_outline, color: Color(0xFF1F5BA6)),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
+                    fillColor: Colors.white.withOpacity(0.05),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: const BorderSide(
-                        color: Color(0xFF00E5FF),
+                        color: Color(0xFF1F5BA6),
                         width: 1.5,
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: const BorderSide(
-                        color: Color(0xFF00E5FF),
+                        color: Color(0xFF1F5BA6),
                         width: 1,
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: const BorderSide(
-                        color: Color(0xFF00FF87),
+                        color: Color(0xFF17A697),
                         width: 2,
                       ),
                     ),
@@ -168,35 +170,37 @@ class _LoginScreenState extends State<LoginScreen> {
                   obscureText: !_showPassword,
                   decoration: InputDecoration(
                     hintText: 'Contraseña',
-                    prefixIcon: const Icon(Icons.lock_outline),
+                    hintStyle: const TextStyle(color: Color(0xFF808080)),
+                    prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF1F5BA6)),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _showPassword ? Icons.visibility_off : Icons.visibility,
+                        color: const Color(0xFF1F5BA6),
                       ),
                       onPressed: () {
                         setState(() => _showPassword = !_showPassword);
                       },
                     ),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
+                    fillColor: Colors.white.withOpacity(0.05),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: const BorderSide(
-                        color: Color(0xFF00E5FF),
+                        color: Color(0xFF1F5BA6),
                         width: 1.5,
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: const BorderSide(
-                        color: Color(0xFF00E5FF),
+                        color: Color(0xFF1F5BA6),
                         width: 1,
                       ),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: const BorderSide(
-                        color: Color(0xFF00FF87),
+                        color: Color(0xFF17A697),
                         width: 2,
                       ),
                     ),
@@ -235,8 +239,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   height: 56,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00FF87),
-                      foregroundColor: Colors.black,
+                      backgroundColor: const Color(0xFF1F5BA6),
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -269,7 +273,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 56),
                     side: const BorderSide(
-                      color: Color(0xFF00E5FF),
+                      color: Color(0xFF1F5BA6),
                       width: 2,
                     ),
                     shape: RoundedRectangleBorder(
@@ -282,9 +286,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: const Text(
                     'CREAR NUEVO USUARIO',
                     style: TextStyle(
-                      color: Color(0xFF00E5FF),
+                      color: Color(0xFF1F5BA6),
                       fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),

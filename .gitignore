@@ -43,3 +43,21 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/app/build
+/android/app/intermediates
+/android/app/outputs
+/android/app/generated
+/android/app/.cxx
+/android/app/.externalNativeBuild
+/android/app/.gradle
+/android/app/.idea
+/android/app/.vscode
+/android/app/.flutter-plugins
+/android/app/.flutter-plugins-dependencies
+/android/app/.packages
+/android/app/.pub-cache
+/android/app/.dart_tool
+
+#git ignore para android gradle cache con rutas largas
+android/~/.gradle_alt/
+android/~/.gradle/

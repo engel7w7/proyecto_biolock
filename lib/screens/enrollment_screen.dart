@@ -240,7 +240,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
         _startDetection();
       }
     } catch (e) {
-      print('❌ [EnrollmentScreen] Exception: $e');
+      print('[EnrollmentScreen] Exception: $e');
       if (mounted) {
         setState(() {
           _cameraFailure = true;
@@ -297,7 +297,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
   Future<void> _completeEnrollment(Face detectedFace) async {
     setState(() {
       _enrollmentDone = true;
-      _statusMessage = '✅ Registrando...';
+      _statusMessage = 'Registrando...';
       _statusColor = Colors.green;
     });
 
@@ -339,7 +339,7 @@ class _EnrollmentScreenState extends State<EnrollmentScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('✅ Usuario $_userName registrado correctamente'),
+        content: Text('Usuario $_userName registrado correctamente'),
         backgroundColor: Colors.green,
         duration: const Duration(seconds: 2),
       ),

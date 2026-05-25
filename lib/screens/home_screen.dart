@@ -93,31 +93,33 @@ class _HomeTabState extends State<_HomeTab> {
         children: [
           // Status card
           Card(
-            elevation: 4,
-            color: Colors.deepPurple.shade50,
+            elevation: 2,
+            color: const Color(0xFF1A1F2E),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Color(0xFF1F5BA6), width: 1),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  const Icon(Icons.verified, size: 48, color: Color(0xFF00E5FF)),
+                  const Icon(Icons.verified, size: 48, color: Color(0xFF1F5BA6)),
                   const SizedBox(height: 12),
                   const Text(
                     'Sistema Biométrico Activado',
                     style: TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF00E5FF),
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFFFFFFF),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Text(
-                    'Bluetooth ${bluetoothService.isConnected ? '✅ Conectado' : '❌ Desconectado'}',
+                    'Bluetooth ${bluetoothService.isConnected ? 'Conectado' : 'Desconectado'}',
                     style: TextStyle(
-                      color: bluetoothService.isConnected ? Colors.green : Colors.red,
+                      color: bluetoothService.isConnected ? Color(0xFF17A697) : Color(0xFFE53935),
                       fontSize: 14,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -129,7 +131,7 @@ class _HomeTabState extends State<_HomeTab> {
           // Main unlock button
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
+              backgroundColor: const Color(0xFF1F5BA6),
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -142,70 +144,107 @@ class _HomeTabState extends State<_HomeTab> {
             icon: const Icon(Icons.lock_open_outlined, size: 28),
             label: const Text(
               'Desbloquear',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
           const SizedBox(height: 24),
           const Text(
             'Usuarios Registrados',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFFFFFFF),
+            ),
           ),
           const SizedBox(height: 12),
           users.isEmpty
               ? Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
+                    border: Border.all(color: const Color(0xFF505050)),
                     borderRadius: BorderRadius.circular(8),
+                    color: const Color(0xFF1A1F2E),
                   ),
                   child: const Text(
                     'No hay usuarios registrados',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(
+                      color: Color(0xFFB0B0B0),
+                      fontSize: 14,
+                    ),
                   ),
                 )
               : ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: users.length,
-                  itemBuilder: (context, index) => ListTile(
-                    tileColor: Colors.grey.shade100,
+                  itemBuilder: (context, index) => Card(
+                    color: const Color(0xFF1A1F2E),
+                    margin: const EdgeInsets.only(bottom: 12),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.deepPurple,
-                      child: Text(
-                        users[index][0].toUpperCase(),
-                        style: const TextStyle(color: Colors.white),
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(
+                        color: Color(0xFF1F5BA6),
+                        width: 1,
                       ),
                     ),
-                    title: Text(users[index]),
-                    trailing: PopupMenuButton(
-                      itemBuilder: (_) => [
-                        PopupMenuItem(
-                          onTap: () => _renameUser(users[index]),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.edit, size: 18),
-                              SizedBox(width: 8),
-                              Text('Renombrar'),
-                            ],
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: const Color(0xFF1F5BA6),
+                        child: Text(
+                          users[index][0].toUpperCase(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        PopupMenuItem(
-                          onTap: () => _deleteUser(users[index]),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.delete, size: 18, color: Colors.red),
-                              SizedBox(width: 8),
-                              Text('Eliminar', style: TextStyle(color: Colors.red)),
-                            ],
-                          ),
+                      ),
+                      title: Text(
+                        users[index],
+                        style: const TextStyle(
+                          color: Color(0xFFFFFFFF),
+                          fontWeight: FontWeight.w500,
                         ),
-                      ],
+                      ),
+                      trailing: PopupMenuButton(
+                        itemBuilder: (_) => [
+                          PopupMenuItem(
+                            onTap: () => _renameUser(users[index]),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.edit,
+                                  size: 18,
+                                  color: Color(0xFF1F5BA6),
+                                ),
+                                SizedBox(width: 8),
+                                Text('Renombrar'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            onTap: () => _deleteUser(users[index]),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.delete,
+                                  size: 18,
+                                  color: Color(0xFFE53935),
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Eliminar',
+                                  style: TextStyle(
+                                    color: Color(0xFFE53935),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -219,23 +258,51 @@ class _HomeTabState extends State<_HomeTab> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Renombrar Usuario'),
+        backgroundColor: const Color(0xFF1A1F2E),
+        title: const Text(
+          'Renombrar Usuario',
+          style: TextStyle(
+            color: Color(0xFFFFFFFF),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(hintText: 'Nuevo nombre'),
+          style: const TextStyle(color: Color(0xFFFFFFFF)),
+          decoration: InputDecoration(
+            hintText: 'Nuevo nombre',
+            hintStyle: const TextStyle(color: Color(0xFF808080)),
+            fillColor: Colors.white.withOpacity(0.05),
+            filled: true,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(
+                color: Color(0xFF1F5BA6),
+              ),
+            ),
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: Color(0xFFB0B0B0)),
+            ),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1F5BA6),
+            ),
             onPressed: () {
               getIt<AuthService>().renameUser(oldName, controller.text);
               Navigator.pop(context);
               setState(() {});
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('✅ Usuario renombrado')),
+                const SnackBar(
+                  content: Text('Usuario renombrado exitosamente'),
+                  backgroundColor: Color(0xFF17A697),
+                ),
               );
             },
             child: const Text('Guardar'),
@@ -249,21 +316,39 @@ class _HomeTabState extends State<_HomeTab> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('¿Eliminar usuario?'),
-        content: Text('¿Estás seguro de eliminar a $userName?'),
+        backgroundColor: const Color(0xFF1A1F2E),
+        title: const Text(
+          'Eliminar usuario',
+          style: TextStyle(
+            color: Color(0xFFFFFFFF),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Text(
+          'Estás a punto de eliminar a $userName. Esta acción no se puede deshacer.',
+          style: const TextStyle(color: Color(0xFFB0B0B0)),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: Color(0xFFB0B0B0)),
+            ),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE53935),
+            ),
             onPressed: () {
               getIt<AuthService>().deleteUser(userName);
               Navigator.pop(context);
               setState(() {});
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('✅ Usuario eliminado')),
+                const SnackBar(
+                  content: Text('Usuario eliminado exitosamente'),
+                  backgroundColor: Color(0xFFE53935),
+                ),
               );
             },
             child: const Text('Eliminar'),
@@ -286,29 +371,40 @@ class _EnrollmentTab extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Card(
-            color: Colors.blue.shade50,
+            color: const Color(0xFF1A1F2E),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(
+                color: Color(0xFF1F5BA6),
+                width: 1,
+              ),
             ),
             child: const Padding(
-              padding: EdgeInsets.all(16),
+              padding: EdgeInsets.all(20),
               child: Column(
                 children: [
-                  Icon(Icons.person_add_alt_1_outlined, size: 48, color: Color(0xFF00B4D8)),
+                  Icon(
+                    Icons.person_add_alt_1_outlined,
+                    size: 48,
+                    color: Color(0xFF1F5BA6),
+                  ),
                   SizedBox(height: 12),
                   Text(
                     'Registrar Nuevo Usuario',
                     style: TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF00B4D8),
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFFFFFFF),
                     ),
                   ),
                   SizedBox(height: 8),
                   Text(
                     'Captura tu rostro para crear acceso biométrico',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(
+                      color: Color(0xFFB0B0B0),
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
@@ -317,7 +413,7 @@ class _EnrollmentTab extends StatelessWidget {
           const SizedBox(height: 24),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
+              backgroundColor: const Color(0xFF1F5BA6),
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -330,7 +426,10 @@ class _EnrollmentTab extends StatelessWidget {
             icon: const Icon(Icons.add_a_photo_outlined, size: 28),
             label: const Text(
               'Nuevo Registro',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],

@@ -57,15 +57,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
           
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('✅ Conectado a ${device.name}'),
-              backgroundColor: Colors.green,
+              content: Text('Conectado a ${device.name}'),
+              backgroundColor: const Color(0xFF17A697),
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('❌ No se pudo conectar a ${device.name}'),
-              backgroundColor: Colors.red,
+              content: Text('No se pudo conectar a ${device.name}'),
+              backgroundColor: const Color(0xFFE53935),
             ),
           );
         }
@@ -92,7 +92,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Desconectado'),
-        backgroundColor: Colors.grey,
+        backgroundColor: Color(0xFF808080),
       ),
     );
   }
@@ -101,9 +101,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('⚙️ Configuración'),
+        title: const Text('Configuración'),
         centerTitle: true,
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: const Color(0xFF1A1F2E),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -112,12 +112,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             // Estado actual de Bluetooth
             Card(
-              elevation: 4,
-              color: _isConnected ? Colors.green.shade50 : Colors.grey.shade100,
+              elevation: 2,
+              color: const Color(0xFF1A1F2E),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
                 side: BorderSide(
-                  color: _isConnected ? Colors.green : Colors.grey,
+                  color: _isConnected ? const Color(0xFF17A697) : const Color(0xFF505050),
+                  width: 1,
                 ),
               ),
               child: Padding(
@@ -127,27 +128,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Icon(
                       Icons.bluetooth,
                       size: 48,
-                      color: _isConnected ? Colors.green : Colors.grey,
+                      color: _isConnected ? const Color(0xFF17A697) : const Color(0xFF808080),
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Bluetooth ${_isConnected ? '✅ Conectado' : '⚠️ Desconectado'}',
+                      'Bluetooth ${_isConnected ? 'Conectado' : 'Desconectado'}',
                       style: TextStyle(
                         fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: _isConnected ? Colors.green : Colors.grey,
+                        fontWeight: FontWeight.w600,
+                        color: _isConnected ? const Color(0xFF17A697) : const Color(0xFFB0B0B0),
                       ),
                     ),
                     if (_connectedDevice != null) ...[
                       const SizedBox(height: 8),
                       Text(
                         'Dispositivo: ${_connectedDevice!.name}',
-                        style: const TextStyle(color: Colors.grey),
+                        style: const TextStyle(
+                          color: Color(0xFFB0B0B0),
+                          fontSize: 14,
+                        ),
                       ),
                       const SizedBox(height: 8),
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
+                          backgroundColor: const Color(0xFFE53935),
+                          foregroundColor: Colors.white,
                         ),
                         onPressed: _disconnect,
                         icon: const Icon(Icons.close),
@@ -165,7 +170,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               'Dispositivos Disponibles',
               style: TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFFFFFFFF),
               ),
             ),
             const SizedBox(height: 12),
@@ -176,16 +182,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
+                  border: Border.all(color: const Color(0xFF505050)),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Column(
                   children: [
-                    Icon(Icons.bluetooth_disabled, color: Colors.grey),
+                    Icon(Icons.bluetooth_disabled, color: Color(0xFF808080)),
                     SizedBox(height: 8),
                     Text(
                       'No hay dispositivos emparejados',
-                      style: TextStyle(color: Colors.grey),
+                      style: TextStyle(color: Color(0xFFB0B0B0)),
                     ),
                   ],
                 ),
@@ -201,20 +207,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   
                   return Card(
                     margin: const EdgeInsets.only(bottom: 12),
+                    color: const Color(0xFF1A1F2E),
                     child: ListTile(
                       leading: Icon(
                         Icons.bluetooth,
-                        color: isThis ? Colors.green : Colors.blue,
+                        color: isThis ? const Color(0xFF17A697) : const Color(0xFF1F5BA6),
                       ),
-                      title: Text(device.name),
-                      subtitle: Text(device.address),
+                      title: Text(
+                        device.name,
+                        style: const TextStyle(color: Color(0xFFFFFFFF)),
+                      ),
+                      subtitle: Text(
+                        device.address,
+                        style: const TextStyle(color: Color(0xFFB0B0B0)),
+                      ),
                       trailing: isThis
                           ? const Chip(
                               label: Text('Conectado'),
-                              backgroundColor: Colors.green,
+                              backgroundColor: Color(0xFF17A697),
                               labelStyle: TextStyle(color: Colors.white),
                             )
                           : ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1F5BA6),
+                              ),
                               onPressed: _isLoading
                                   ? null
                                   : () => _connectToDevice(device),
@@ -228,7 +244,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 24),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepPurple,
+                backgroundColor: const Color(0xFF1F5BA6),
               ),
               onPressed: _isLoading ? null : _loadDevices,
               icon: const Icon(Icons.refresh),

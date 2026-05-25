@@ -13,8 +13,9 @@ void setupServiceLocator() {
   // Servicios singleton
   getIt.registerSingleton<DatabaseService>(DatabaseService());
   getIt.registerSingleton<SessionService>(SessionService());
-  getIt.registerSingleton<CameraService>(CameraService());
-  getIt.registerSingleton<FaceDetectionService>(FaceDetectionService());
+  // Servicios lazy para evitar problemas con FlutterJNI en startup
+  getIt.registerLazySingleton<CameraService>(() => CameraService());
+  getIt.registerLazySingleton<FaceDetectionService>(() => FaceDetectionService());
   getIt.registerSingleton<BluetoothService>(BluetoothService());
   getIt.registerSingleton<AuthService>(AuthService());
 }

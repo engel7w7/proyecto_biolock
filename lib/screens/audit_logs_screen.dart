@@ -102,7 +102,7 @@ class _AuditLogsScreenState extends State<AuditLogsScreen> {
       body: _isLoading
           ? const Center(
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00E5FF)),
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1F5BA6)),
               ),
             )
           : _errorMessage.isNotEmpty

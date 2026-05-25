@@ -36,23 +36,23 @@ class SetupScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: const Color(0xFF00E5FF),
+                        color: const Color(0xFF1F5BA6),
                         width: 3,
                       ),
                     ),
                     child: const Icon(
                       Icons.security_outlined,
                       size: 60,
-                      color: Color(0xFF00E5FF),
+                      color: Color(0xFF1F5BA6),
                     ),
                   ),
                   const SizedBox(height: 20),
                   const Text(
                     'BioLock System',
                     style: TextStyle(
-                      color: Color(0xFF00E5FF),
+                      color: Color(0xFFFFFFFF),
                       fontSize: 28,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                       letterSpacing: 2,
                     ),
                   ),
@@ -60,7 +60,7 @@ class SetupScreen extends StatelessWidget {
                   const Text(
                     'Reconocimiento Facial Inteligente',
                     style: TextStyle(
-                      color: Colors.white54,
+                      color: Color(0xFFB0B0B0),
                       fontSize: 14,
                     ),
                   ),
@@ -74,7 +74,7 @@ class SetupScreen extends StatelessWidget {
                   color: Colors.black26,
                   borderRadius: BorderRadius.circular(15),
                   border: Border.all(
-                    color: const Color(0xFF00E5FF).withOpacity(0.3),
+                    color: const Color(0xFF1F5BA6).withOpacity(0.3),
                     width: 1,
                   ),
                 ),
@@ -84,9 +84,9 @@ class SetupScreen extends StatelessWidget {
                     const Text(
                       'Primeros Pasos',
                       style: TextStyle(
-                        color: Color(0xFF00E5FF),
+                        color: Color(0xFFFFFFFF),
                         fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 15),
@@ -108,7 +108,7 @@ class SetupScreen extends StatelessWidget {
                     _setupStep(
                       '4',
                       '¡Listo para desbloquear!',
-                      const Color(0xFF00FF87),
+                      const Color(0xFF17A697),
                     ),
                   ],
                 ),
@@ -139,8 +139,8 @@ class SetupScreen extends StatelessWidget {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00FF87),
-                    foregroundColor: Colors.black,
+                    backgroundColor: const Color(0xFF1F5BA6),
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     minimumSize: const Size(double.infinity, 50),
                     shape: RoundedRectangleBorder(
@@ -151,7 +151,7 @@ class SetupScreen extends StatelessWidget {
                     'COMENZAR REGISTRO',
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                       letterSpacing: 1.5,
                     ),
                   ),
@@ -175,7 +175,7 @@ class SetupScreen extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: const Color(0xFF00E5FF),
+                color: const Color(0xFF1F5BA6),
                 width: 2,
               ),
             ),
@@ -183,8 +183,8 @@ class SetupScreen extends StatelessWidget {
               child: Text(
                 number,
                 style: const TextStyle(
-                  color: Color(0xFF00E5FF),
-                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1F5BA6),
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
