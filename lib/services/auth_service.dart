@@ -5,11 +5,16 @@ import 'dart:convert';
 import '../models/app_state.dart';
 import 'database_service.dart';
 import 'session_service.dart';
+import 'face_detection_service.dart';
+import 'service_locator.dart'; // Importación requerida para acoplar getIt centralizado
 
 class AuthService {
   static final Logger _logger = Logger();
   final _db = DatabaseService();
   final _session = SessionService();
+  
+  // === ARQUITECTURA CORREGIDA: Consumo de la instancia síncrona del Singleton ===
+  FaceDetectionService get _faceDetectorService => getIt<FaceDetectionService>();
   
   AuthenticatedUser? _currentUser;
   Face? _enrolledFace;
@@ -81,7 +86,7 @@ class AuthService {
     return _allUsers.keys.toList();
   }
 
-  /// Registrar un nuevo usuario con su rostro
+  /// Registrar un nuevo usuario extrayendo y serializando su mapa vectorial geométrico real
   Future<bool> enrollUser(
     String userName,
     Face faceData, {
@@ -93,7 +98,10 @@ class AuthService {
         return false;
       }
 
-      final faceDataStr = faceData.toString();
+      // Construcción del vector flotante analítico mediante el singleton unificado
+      final vector = _faceDetectorService.extractFaceVector(faceData);
+      final faceDataStr = jsonEncode(vector);
+      
       // Usar contraseña proporcionada o generar una por defecto
       final passwordHash = SessionService.hashPassword(password ?? userName);
       
@@ -112,7 +120,7 @@ class AuthService {
           'lastAccess': null,
         };
 
-        print('[AuthService] Usuario registrado exitosamente');
+        print('[AuthService] Usuario registrado exitosamente con mapa vectorial');
         return true;
       }
 
@@ -174,13 +182,13 @@ class AuthService {
 
       return success;
     } catch (e) {
-      print('[AuthService] Error eliminando usuario: $e');
+      print('[AuthService] Error scrapping de usuario: $e');
       return false;
     }
   }
 
-  /// Autenticar un rostro contra todos los usuarios
-  FaceRecognitionResult authenticateWithFace(Face detectedFace) {
+  /// Autenticar un rostro calculando la Distancia Euclidiana Real en base paralela
+  Future<FaceRecognitionResult> authenticateWithFace(Face detectedFace) async {
     try {
       if (_allUsers.isEmpty) {
         return FaceRecognitionResult(
@@ -191,36 +199,42 @@ class AuthService {
         );
       }
 
-      // Comparar con cada usuario (simulación)
+      // 1. Obtener la firma analítica del frame mediante el singleton unificado
+      final currentVector = _faceDetectorService.extractFaceVector(detectedFace);
+
+      // 2. Iterar y decodificar cada elemento de SQLite
       for (var userName in _allUsers.keys) {
-        // En producción, usar embeddings reales
-        // Por ahora: Si hay usuarios, entonces hay coincidencia
-        final result = FaceRecognitionResult(
-          isMatched: true,
-          confidence: 0.95,
-          timestamp: DateTime.now().toIso8601String(),
-          errorMessage: null,
-        );
+        try {
+          final savedVectorStr = _allUsers[userName]!['faceEmbedding'].toString();
+          final List<dynamic> decodedList = jsonDecode(savedVectorStr);
+          final List<double> enrolledVector = decodedList.map((e) => (e as num).toDouble()).toList();
 
-        if (result.isMatched) {
-          _allUsers[userName]!['accessCount'] = 
-            (_allUsers[userName]!['accessCount'] as int) + 1;
-          _allUsers[userName]!['lastAccess'] = 
-            DateTime.now().toIso8601String();
-          
-          _currentUser = AuthenticatedUser(
-            id: userName,
-            name: userName,
-            faceEmbedding: _allUsers[userName]!['faceEmbedding'],
-            enrollmentDate: DateTime.parse(
-              _allUsers[userName]!['enrollmentDate']
-            ),
-            accessAttempts: _allUsers[userName]!['accessCount'],
-            lastAccess: DateTime.now(),
-          );
+          // Contrastar bajo los plazos del Planificador en Tiempo Real (T-VAL = 50ms)
+          final result = await _faceDetectorService.compareFacesReal(currentVector, enrolledVector);
 
-          _logger.i('✅ Autenticado: $userName');
-          return result;
+          if (result.isMatched) {
+            _allUsers[userName]!['accessCount'] = 
+              (_allUsers[userName]!['accessCount'] as int) + 1;
+            _allUsers[userName]!['lastAccess'] = 
+              DateTime.now().toIso8601String();
+            
+            _currentUser = AuthenticatedUser(
+              id: userName,
+              name: userName,
+              faceEmbedding: savedVectorStr,
+              enrollmentDate: DateTime.parse(
+                _allUsers[userName]!['enrollmentDate']
+              ),
+              accessAttempts: _allUsers[userName]!['accessCount'],
+              lastAccess: DateTime.now(),
+            );
+
+            _logger.i('✅ Autenticado Biométricamente: $userName');
+            return result;
+          }
+        } catch (jsonErr) {
+          _logger.w('Ignorando registro no parseable de $userName: $jsonErr');
+          continue; 
         }
       }
 
@@ -251,13 +265,10 @@ class AuthService {
     }
   }
 
-  /// Obtiene el historial de accesos del usuario actual
   int getAccessCount() => _currentUser?.accessAttempts ?? 0;
 
-  /// Obtiene la última hora de acceso
   DateTime? getLastAccessTime() => _currentUser?.lastAccess;
 
-  /// Limpia datos de sesión
   void logout() {
     _session.logout();
     _currentUser = null;
@@ -265,7 +276,6 @@ class AuthService {
     _logger.i('Sesión cerrada');
   }
 
-  /// Limpia todos los usuarios (reset)
   Future<void> clearAllUsers() async {
     _allUsers.clear();
     _currentUser = null;
@@ -334,4 +344,3 @@ extension AuthenticatedUserCopyWith on AuthenticatedUser {
     );
   }
 }
-

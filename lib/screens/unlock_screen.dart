@@ -27,6 +27,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
   bool _cameraFailed = false;
   String _statusMessage = 'Inicializando cámara...';
   Color _statusColor = Colors.orange;
+  
+  // Variable agregada para la estabilización temporal analítica contra Jitter
+  int _consecutiveMatches = 0;
 
   @override
   void initState() {
@@ -116,6 +119,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
   }
 
   void _startFaceDetection() {
+    _consecutiveMatches = 0; // Resetear contador al iniciar el stream
     _cameraService.startImageStream((image) async {
       if (_isProcessing) return;
 
@@ -125,25 +129,36 @@ class _UnlockScreenState extends State<UnlockScreen> {
         final faces = await _faceDetectionService.detectFaces(image);
 
         if (faces.isNotEmpty) {
-          // Rostro detectado - intentar autenticar
-          final result = _authService.authenticateWithFace(faces.first);
+          // === EVALUACIÓN ASÍNCRONA VECTORIAL CRÍTICA (T-VAL) ===
+          final result = await _authService.authenticateWithFace(faces.first);
 
           if (mounted) {
             if (result.isMatched) {
-              setState(() {
-                _statusMessage = 'Acceso Concedido';
-                _statusColor = Colors.green;
-              });
+              _consecutiveMatches++;
+              
+              // Filtro STR: Exigimos estabilidad biométrica durante 2 frames consecutivos
+              if (_consecutiveMatches >= 2) {
+                setState(() {
+                  _statusMessage = 'Acceso Concedido';
+                  _statusColor = Colors.green;
+                });
 
-              // === COMANDO REAL AL ESP32 ===
-              await _bluetoothService.openLock();
+                // === COMANDO REAL AL ESP32 ===
+                await _bluetoothService.openLock();
 
-              await Future.delayed(const Duration(seconds: 2));
+                await Future.delayed(const Duration(seconds: 2));
 
-              if (mounted) {
-                Navigator.pop(context, true);
+                if (mounted) {
+                  Navigator.pop(context, true);
+                }
+              } else {
+                setState(() {
+                  _statusMessage = 'Estabilizando firma geométrica...';
+                  _statusColor = Colors.blue;
+                });
               }
             } else {
+              _consecutiveMatches = 0; // Romper racha si un frame falla la tolerancia
               setState(() {
                 _statusMessage = 'Rostro no reconocido';
                 _statusColor = Colors.red;
@@ -163,6 +178,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
             }
           }
         } else {
+          _consecutiveMatches = 0; // Resetear si el rostro sale del encuadre
           if (mounted && _statusColor != Colors.blue) {
             setState(() {
               _statusMessage = 'Acerca tu rostro a la camara...';

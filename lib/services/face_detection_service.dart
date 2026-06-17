@@ -24,7 +24,7 @@ class FaceDetectionService {
       final options = FaceDetectorOptions(
         enableTracking: true,
         enableClassification: true,
-        enableLandmarks: true,
+        enableLandmarks: true, // CRÍTICO: Mapeo de landmarks activado para la firma vectorial
         performanceMode: FaceDetectorMode.fast, // Modo rápido para mejor performance
       );
       _faceDetector = FaceDetector(options: options);
@@ -33,6 +33,59 @@ class FaceDetectionService {
     } catch (e) {
       _logger.e('✗ Error inicializando FaceDetector: $e');
     }
+  }
+
+  /// Extrae proporciones biométricas estructurales puras (Invariante al Bounding Box)
+  List<double> extractFaceVector(Face face) {
+    final leftEye = face.landmarks[FaceLandmarkType.leftEye];
+    final rightEye = face.landmarks[FaceLandmarkType.rightEye];
+    final nose = face.landmarks[FaceLandmarkType.noseBase];
+    final bottomMouth = face.landmarks[FaceLandmarkType.bottomMouth];
+    final leftMouth = face.landmarks[FaceLandmarkType.leftMouth];
+    final rightMouth = face.landmarks[FaceLandmarkType.rightMouth];
+
+    // Si faltan los ojos, no podemos calcular la unidad base analítica
+    if (leftEye == null || rightEye == null) {
+      return List.generate(6, (_) => 1.0);
+    }
+
+    // 1. Calcular la Distancia Interpupilar (Nuestra Unidad de Medida Base)
+    double dxEyes = (leftEye.position.x - rightEye.position.x).toDouble();
+    double dyEyes = (leftEye.position.y - rightEye.position.y).toDouble();
+    double interPupillaryDistance = sqrt(dxEyes * dxEyes + dyEyes * dyEyes);
+
+    if (interPupillaryDistance == 0) interPupillaryDistance = 1.0;
+
+    // Función auxiliar síncrona para medir distancias puras entre puntos en píxeles
+    double distanceBetween(FaceLandmark? p1, FaceLandmark? p2) {
+      if (p1 == null || p2 == null) return interPupillaryDistance * 0.5; // Contingencia
+      double dx = (p1.position.x - p2.position.x).toDouble();
+      double dy = (p1.position.y - p2.position.y).toDouble();
+      return sqrt(dx * dx + dy * dy);
+    }
+
+    // 2. Construir el vector basado en relaciones de proporciones óseas reales
+    final List<double> structuralVector = [];
+    
+    // Proporción 1: Ancho de la boca respecto a la distancia de los ojos
+    structuralVector.add(distanceBetween(leftMouth, rightMouth) / interPupillaryDistance);
+    
+    // Proporción 2: Distancia de nariz a ojo izquierdo
+    structuralVector.add(distanceBetween(nose, leftEye) / interPupillaryDistance);
+    
+    // Proporción 3: Distancia de nariz a ojo derecho
+    structuralVector.add(distanceBetween(nose, rightEye) / interPupillaryDistance);
+    
+    // Proporción 4: Distancia de nariz al labio inferior
+    structuralVector.add(distanceBetween(nose, bottomMouth) / interPupillaryDistance);
+    
+    // Proporción 5: Distancia del ojo izquierdo a la comisura labial izquierda
+    structuralVector.add(distanceBetween(leftEye, leftMouth) / interPupillaryDistance);
+    
+    // Proporción 6: Distancia del ojo derecho a la comisura labial derecha
+    structuralVector.add(distanceBetween(rightEye, rightMouth) / interPupillaryDistance);
+
+    return structuralVector;
   }
 
   /// Detecta rostros en una imagen e instrumenta T-DET
@@ -139,101 +192,25 @@ class FaceDetectionService {
     }
   }
 
-  /// Compara rostros con embeddings e instrumenta T-VAL
+  /// Compara rostros con embeddings de landmarks reales e instrumenta T-VAL (Legacy wrapper compatibility)
   Future<FaceRecognitionResult> compareFaces(
     List<Face> detectedFaces,
     Face? enrolledFace,
   ) async {
-    // === INSTRUMENTACIÓN STR: INICIO MEDICIÓN T-VAL ===
-    final stopwatch = Stopwatch()..start();
-    
-    try {
-      if (detectedFaces.isEmpty) {
-        stopwatch.stop();
-        return FaceRecognitionResult(
-          isMatched: false,
-          confidence: 0.0,
-          timestamp: DateTime.now().toIso8601String(),
-          errorMessage: 'No se detecto rostro',
-        );
-      }
-
-      if (enrolledFace == null) {
-        stopwatch.stop();
-        return FaceRecognitionResult(
-          isMatched: false,
-          confidence: 0.0,
-          timestamp: DateTime.now().toIso8601String(),
-          errorMessage: 'No hay rostro registrado',
-        );
-      }
-
-      // Simulación: comparar características básicas (ancho de cara)
-      final detectedFace = detectedFaces.first;
-      
-      // ML Kit 0.13.2 usa diferentes métricas
-      // Usamos simulation simple basada en boundingBox
-      final enrolledBounds = enrolledFace.boundingBox;
-      final detectedBounds = detectedFace.boundingBox;
-      
-      // Comparar tamaño relativo de bounding boxes
-      final widthRatio = detectedBounds.width / enrolledBounds.width;
-      final heightRatio = detectedBounds.height / enrolledBounds.height;
-      
-      // Si el ratio está entre 0.8 y 1.2, es una coincidencia potencial
-      final double sizeMatch = 1.0 - ((widthRatio - 1.0).abs() + (heightRatio - 1.0).abs()) / 2;
-      final double confidence = (sizeMatch * 100).clamp(0.0, 1.0);
-      
-      // Umbral de confianza
-      const double confidenceThreshold = 0.75;
-      final bool isMatched = confidence >= confidenceThreshold;
-
-      stopwatch.stop();
-      
-      // === ENFORZAMIENTO STR (T-VAL = 50ms) ===
-      if (stopwatch.elapsedMilliseconds > STRConfig.DEADLINE_T_VAL) {
-        await DatabaseService().logSTRMetrics(
-          'T-VAL',
-          stopwatch.elapsedMilliseconds.toDouble(),
-          STRConfig.DEADLINE_T_VAL.toDouble()
-        );
-        _logger.e('FALLO STR: T-VAL excedio el plazo de ${STRConfig.DEADLINE_T_VAL}ms');
-        throw Exception('STR_DEADLINE_MISS_VAL');
-      }
-      
-      // === INSTRUMENTACIÓN STR: REGISTRO T-VAL ===
-      // Código: T-VAL, Deadline Nominal de diseño: 50.0 ms
-      await DatabaseService().logSTRMetrics(
-        'T-VAL', 
-        stopwatch.elapsedMilliseconds.toDouble(), 
-        STRConfig.DEADLINE_T_VAL.toDouble()
-      );
-
-      _logger.i('Comparacion: matched=$isMatched, confidence=${(confidence * 100).toStringAsFixed(1)}%');
-
-      return FaceRecognitionResult(
-        isMatched: isMatched,
-        confidence: confidence,
-        timestamp: DateTime.now().toIso8601String(),
-      );
-    } catch (e) {
-      stopwatch.stop();
-      if (e.toString().contains('STR_DEADLINE_MISS_VAL')) rethrow; // Pasa el error critico arriba
-      _logger.e('Error comparando rostros: $e');
+    if (detectedFaces.isEmpty || enrolledFace == null) {
       return FaceRecognitionResult(
         isMatched: false,
         confidence: 0.0,
         timestamp: DateTime.now().toIso8601String(),
-        errorMessage: 'Error: $e',
       );
     }
+    final currentVec = extractFaceVector(detectedFaces.first);
+    final enrolledVec = extractFaceVector(enrolledFace);
+    return await compareFacesReal(currentVec, enrolledVec);
   }
 
   /// Convierte CameraImage a InputImage para ML Kit  
   InputImage _convertCameraImage(CameraImage image) {
-    // Estrategia: intentar diferentes formatos y rotaciones
-    // Device: Xiaomi M2012K10C, Android 13, Landscape 720x480
-    
     try {
       // Obtener los tres planos YUV
       final planes = image.planes;
@@ -269,8 +246,7 @@ class FaceDetectionService {
       // Copiar U plane (quarter resolution)
       nv21data.setRange(offset, offset + planes[1].bytes.length, planes[1].bytes);
 
-      _logger.d('Imagen convertida: ${image.width}x${image.height}, '
-        'bytes=${nv21data.length}, stride=${planes[0].bytesPerRow}');
+      _logger.d('Imagen convertida: ${image.width}x${image.height}, bytes=${nv21data.length}, stride=${planes[0].bytesPerRow}');
 
       return InputImage.fromBytes(
         bytes: nv21data,
@@ -297,7 +273,7 @@ class FaceDetectionService {
 
   /// Compara el rostro actual contra el almacenado usando Distancia Euclidiana Real
   Future<FaceRecognitionResult> compareFacesReal(
-    List<double> currentEmbedding, // El vector de 128 datos extraído por MobileFaceNet
+    List<double> currentEmbedding, // El vector de datos extraído por landmarks normalizados
     List<double> enrolledEmbedding, // El vector cargado desde tu SQLite
   ) async {
     // === INSTRUMENTACIÓN STR: INICIO MEDICIÓN T-VAL ===
@@ -332,9 +308,8 @@ class FaceDetectionService {
       }
       double euclideanDistance = sqrt(sum);
 
-      // Umbral estricto de aceptación en biometría (0.6)
-      // Menor distancia implica mayor similitud geométrica
-      const double threshold = 0.6;
+      // Umbral altamente estable para distancias antropométricas relativas puras
+      const double threshold = 0.18;
       bool isMatched = euclideanDistance < threshold;
 
       // Normalización matemática para mostrar porcentaje de confianza
@@ -354,7 +329,6 @@ class FaceDetectionService {
       }
       
       // === INSTRUMENTACIÓN STR: REGISTRO T-VAL ===
-      // Código: T-VAL, Deadline Nominal de diseño: 50.0 ms
       await DatabaseService().logSTRMetrics(
         'T-VAL', 
         stopwatch.elapsedMilliseconds.toDouble(), 
