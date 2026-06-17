@@ -43,19 +43,10 @@ cd biolock_web
 
 #### 2. Preparar dependencias (Windows)
 ```bash
-# Ejecutar el script de compilación
-BUILD.bat
-
-# O manualmente:
 flutter clean
 flutter pub get
 ```
 
-#### En Linux/Mac:
-```bash
-chmod +x BUILD.sh
-./BUILD.sh
-```
 
 #### 3. Compilar e Instalar
 ```bash
