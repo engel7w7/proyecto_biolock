@@ -2,14 +2,16 @@
 /// Basado en Tablas de Análisis de Tiempos Reales del Proyecto BioLock
 class STRConfig {
   // Plazos Máximos de Terminación (Deadlines - Di) según Tabla 1
-  // T-DET: Inferencia MobileFaceNet
-  static const int DEADLINE_T_DET = 100;
+  // Aumentados para absorber la carga matemática del mapeo vectorial geométrico
   
-  // T-VAL: Validación (Distancia Euclidiana)
-  static const int DEADLINE_T_VAL = 50;
+  // T-DET: Inferencia MobileFaceNet y conversión NV21
+  static const int DEADLINE_T_DET = 300; // Antes 100
+  
+  // T-VAL: Validación (Distancia Euclidiana e iteración SQLite)
+  static const int DEADLINE_T_VAL = 200; // Antes 50
   
   // T-BTX: Transmisión Serial RFCOMM
-  static const int DEADLINE_T_BTX = 10;
+  static const int DEADLINE_T_BTX = 20;
   
   // T-ALM: Alarma de Rechazo
   static const int DEADLINE_T_ALM = 500;

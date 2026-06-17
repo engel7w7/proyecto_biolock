@@ -6,7 +6,7 @@ import '../services/camera_service.dart';
 import '../services/face_detection_service.dart';
 import '../services/bluetooth_service.dart';
 import '../services/auth_service.dart';
-import '../utils/str_constants.dart'; // Para manejo de STR
+import '../utils/str_constants.dart'; 
 import '../widgets/camera_preview_widget.dart';
 
 class UnlockScreen extends StatefulWidget {
@@ -27,9 +27,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
   bool _cameraFailed = false;
   String _statusMessage = 'Inicializando cámara...';
   Color _statusColor = Colors.orange;
-  
-  // Variable agregada para la estabilización temporal analítica contra Jitter
+
   int _consecutiveMatches = 0;
+  DateTime? _scanningStartTime;
 
   @override
   void initState() {
@@ -62,7 +62,6 @@ class _UnlockScreenState extends State<UnlockScreen> {
         return;
       }
       
-      // **15 segundos máximo** - Tiempo para hardware muy lento
       bool success = false;
       try {
         success = await _cameraService.initializeCamera().timeout(
@@ -84,7 +83,6 @@ class _UnlockScreenState extends State<UnlockScreen> {
         return;
       }
 
-      // Validate controller before proceeding
       if (_cameraService.controller == null) {
         print('[UnlockScreen] Controller is null after init');
         if (mounted) {
@@ -119,7 +117,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
   }
 
   void _startFaceDetection() {
-    _consecutiveMatches = 0; // Resetear contador al iniciar el stream
+    _consecutiveMatches = 0;
+    _scanningStartTime = null;
+
     _cameraService.startImageStream((image) async {
       if (_isProcessing) return;
 
@@ -129,23 +129,56 @@ class _UnlockScreenState extends State<UnlockScreen> {
         final faces = await _faceDetectionService.detectFaces(image);
 
         if (faces.isNotEmpty) {
-          // === EVALUACIÓN ASÍNCRONA VECTORIAL CRÍTICA (T-VAL) ===
-          final result = await _authService.authenticateWithFace(faces.first);
+          final face = faces.first;
+
+          _scanningStartTime ??= DateTime.now();
+
+          if (!_faceDetectionService.isHeadAligned(face)) {
+            final int millis = DateTime.now().difference(_scanningStartTime!).inMilliseconds;
+            final double secs = millis / 1000.0;
+            
+            if (secs >= 3.0) {
+              _scanningStartTime = null;
+              if (mounted) {
+                setState(() {
+                  _statusMessage = 'Escaneo fallido por posicion';
+                  _statusColor = Colors.red;
+                });
+              }
+              await _bluetoothService.rejectAccess();
+              await Future.delayed(const Duration(seconds: 2));
+              if (mounted) {
+                setState(() {
+                  _statusMessage = 'Acerca tu rostro a la camara...';
+                  _statusColor = Colors.blue;
+                });
+              }
+            } else {
+              if (mounted) {
+                setState(() {
+                  _statusMessage = 'Mira de frente... (${secs.toStringAsFixed(1)}s/3s)';
+                  _statusColor = Colors.orange;
+                });
+              }
+            }
+            _isProcessing = false;
+            return; 
+          }
+
+          final result = await _authService.authenticateWithFace(face);
 
           if (mounted) {
             if (result.isMatched) {
               _consecutiveMatches++;
               
-              // Filtro STR: Exigimos estabilidad biométrica durante 2 frames consecutivos
               if (_consecutiveMatches >= 2) {
+                _scanningStartTime = null; 
                 setState(() {
                   _statusMessage = 'Acceso Concedido';
                   _statusColor = Colors.green;
                 });
 
-                // === COMANDO REAL AL ESP32 ===
                 await _bluetoothService.openLock();
-
                 await Future.delayed(const Duration(seconds: 2));
 
                 if (mounted) {
@@ -153,58 +186,79 @@ class _UnlockScreenState extends State<UnlockScreen> {
                 }
               } else {
                 setState(() {
-                  _statusMessage = 'Estabilizando firma geométrica...';
+                  _statusMessage = 'Estabilizando firma...';
                   _statusColor = Colors.blue;
                 });
               }
             } else {
-              _consecutiveMatches = 0; // Romper racha si un frame falla la tolerancia
-              setState(() {
-                _statusMessage = 'Rostro no reconocido';
-                _statusColor = Colors.red;
-              });
+              _consecutiveMatches = 0; 
+              
+              final int millis = DateTime.now().difference(_scanningStartTime!).inMilliseconds;
+              final double secs = millis / 1000.0;
 
-              // === COMANDO DE RECHAZO AL ESP32 ===
-              await _bluetoothService.rejectAccess();
-
-              await Future.delayed(const Duration(seconds: 2));
-
-              if (mounted) {
+              if (secs >= 3.0) {
+                _scanningStartTime = null;
                 setState(() {
-                  _statusMessage = 'Acerca tu rostro a la camara...';
+                  _statusMessage = 'Rostro no reconocido';
+                  _statusColor = Colors.red;
+                });
+
+                await _bluetoothService.rejectAccess();
+                await Future.delayed(const Duration(seconds: 2));
+
+                if (mounted) {
+                  setState(() {
+                    _statusMessage = 'Acerca tu rostro a la camara...';
+                    _statusColor = Colors.blue;
+                  });
+                }
+              } else {
+                setState(() {
+                  _statusMessage = 'Analizando... (${secs.toStringAsFixed(1)}s/3s)';
                   _statusColor = Colors.blue;
                 });
               }
             }
           }
         } else {
-          _consecutiveMatches = 0; // Resetear si el rostro sale del encuadre
-          if (mounted && _statusColor != Colors.blue) {
-            setState(() {
-              _statusMessage = 'Acerca tu rostro a la camara...';
-              _statusColor = Colors.blue;
-            });
+          _consecutiveMatches = 0;
+          
+          if (_scanningStartTime != null) {
+            final int millis = DateTime.now().difference(_scanningStartTime!).inMilliseconds;
+            final double secs = millis / 1000.0;
+            
+            if (secs >= 3.0) {
+              _scanningStartTime = null; 
+              if (mounted && _statusColor != Colors.blue) {
+                setState(() {
+                  _statusMessage = 'Acerca tu rostro a la camara...';
+                  _statusColor = Colors.blue;
+                });
+              }
+            } else {
+              if (mounted) {
+                setState(() {
+                  _statusMessage = 'No te muevas... (${secs.toStringAsFixed(1)}s/3s)';
+                  _statusColor = Colors.orange;
+                });
+              }
+            }
+          } else {
+            if (mounted && _statusColor != Colors.blue) {
+              setState(() {
+                _statusMessage = 'Acerca tu rostro a la camara...';
+                _statusColor = Colors.blue;
+              });
+            }
           }
         }
       } catch (e) {
-        // === GESTIÓN DE EXCEPCIONES STR ===
         if (e.toString().contains('STR_DEADLINE_MISS')) {
-          print('DEADLINE MISS CAPTURADO: Abortando acceso por latencia.');
+          print('Fallo STR capturado. Ignorando fotograma.');
           if (mounted) {
             setState(() {
-              _statusMessage = 'Fallo STR: Tiempo Excedido';
-              _statusColor = Colors.orange; // Color de alerta tecnica
-            });
-          }
-          
-          // Por seguridad (STR Critico), mandamos comando de rechazo (Buzzer)
-          await _bluetoothService.rejectAccess(); 
-          await Future.delayed(const Duration(seconds: 2));
-          
-          if (mounted) {
-            setState(() {
-              _statusMessage = 'Acerca tu rostro a la camara...';
-              _statusColor = Colors.blue;
+              _statusMessage = 'Enfocando...';
+              _statusColor = Colors.orange; 
             });
           }
         } else {
@@ -270,12 +324,10 @@ class _UnlockScreenState extends State<UnlockScreen> {
           : _isInitialized && _cameraService.controller != null
               ? Stack(
                   children: [
-                    // Vista previa de cámara
                     CameraPreviewWidget(
                       controller: _cameraService.controller!,
                       isAuthorized: true,
                     ),
-                    // Overlay con status
                 Positioned(
                   bottom: 0,
                   left: 0,
