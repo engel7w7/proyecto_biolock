@@ -1,5 +1,5 @@
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart'; // NUEVA LIBRERIA
+import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart'; 
 import 'package:camera/camera.dart';
 import 'package:logger/logger.dart';
 import 'dart:typed_data';
@@ -13,7 +13,7 @@ import 'database_service.dart';
 class FaceDetectionService {
   static final Logger _logger = Logger();
   late FaceDetector _faceDetector;
-  late BarcodeScanner _barcodeScanner; // NUEVO ESCANER
+  late BarcodeScanner _barcodeScanner; 
   bool _isInitialized = false;
   int _frameCount = 0;
   int _successfulDetections = 0;
@@ -46,15 +46,12 @@ class FaceDetectionService {
 
     if (yaw == null || pitch == null) return false;
 
-    // Tolerancia ajustada a 12 grados. Obliga al usuario a mirar de frente 
-    // para evitar que la perspectiva 2D engañe al algoritmo.
     if (yaw.abs() > 12.0 || pitch.abs() > 12.0) {
       return false;
     }
     return true;
   }
 
-  /// VECTOR DE 9 DIMENSIONES (Alta Seguridad contra Familiares)
   List<double> extractFaceVector(Face face) {
     final leftEye = face.landmarks[FaceLandmarkType.leftEye];
     final rightEye = face.landmarks[FaceLandmarkType.rightEye];
@@ -63,13 +60,11 @@ class FaceDetectionService {
     final leftMouth = face.landmarks[FaceLandmarkType.leftMouth];
     final rightMouth = face.landmarks[FaceLandmarkType.rightMouth];
     
-    // NUEVOS PUNTOS: Pómulos para medir el ancho del rostro
     final leftCheek = face.landmarks[FaceLandmarkType.leftCheek];
     final rightCheek = face.landmarks[FaceLandmarkType.rightCheek];
 
-    // Si la cara no está completa, devolvemos un vector neutro de contingencia
     if (leftEye == null || rightEye == null) {
-      return List.generate(9, (_) => 1.0); // Actualizado a 9 dimensiones
+      return List.generate(9, (_) => 1.0); 
     }
 
     double dxEyes = (leftEye.position.x - rightEye.position.x).toDouble();
@@ -87,7 +82,6 @@ class FaceDetectionService {
 
     final List<double> structuralVector = [];
     
-    // Proporciones Centrales (Genética común)
     structuralVector.add(distanceBetween(leftMouth, rightMouth) / interPupillaryDistance);
     structuralVector.add(distanceBetween(nose, leftEye) / interPupillaryDistance);
     structuralVector.add(distanceBetween(nose, rightEye) / interPupillaryDistance);
@@ -95,7 +89,6 @@ class FaceDetectionService {
     structuralVector.add(distanceBetween(leftEye, leftMouth) / interPupillaryDistance);
     structuralVector.add(distanceBetween(rightEye, rightMouth) / interPupillaryDistance);
     
-    // Proporciones de Contorno (Diferenciador de Hermanos: Ancho de cara y mandíbula)
     structuralVector.add(distanceBetween(leftCheek, rightCheek) / interPupillaryDistance);
     structuralVector.add(distanceBetween(nose, leftCheek) / interPupillaryDistance);
     structuralVector.add(distanceBetween(nose, rightCheek) / interPupillaryDistance);
@@ -103,7 +96,6 @@ class FaceDetectionService {
     return structuralVector;
   }
 
-  // MODIFICADO: Se añade "direction" para rotar correctamente la matriz de bytes
   Future<List<Face>> detectFaces(CameraImage image, {CameraLensDirection direction = CameraLensDirection.front}) async {
     late final Stopwatch stopwatch;
     
@@ -153,7 +145,6 @@ class FaceDetectionService {
         }
       }
       
-      // ROTACION DINAMICA DE CAMARA AÑADIDA AQUI
       final rotation = direction == CameraLensDirection.front
           ? InputImageRotation.rotation270deg
           : InputImageRotation.rotation90deg;
@@ -217,12 +208,11 @@ class FaceDetectionService {
     return await compareFacesReal(currentVec, enrolledVec);
   }
 
-  // MODIFICADO: Se añade "direction" para rotar correctamente la matriz de bytes
+  // <--- TU CÓDIGO MANUAL ORIGINAL DE VUELTA PARA EVITAR EL ERROR DE ANDROID --->
   InputImage _convertCameraImage(CameraImage image, {CameraLensDirection direction = CameraLensDirection.front}) {
     try {
       final planes = image.planes;
       
-      // ROTACION DINAMICA
       final rotation = direction == CameraLensDirection.front
           ? InputImageRotation.rotation270deg
           : InputImageRotation.rotation90deg;
@@ -233,7 +223,7 @@ class FaceDetectionService {
           metadata: InputImageMetadata(
             size: Size(image.width.toDouble(), image.height.toDouble()),
             rotation: rotation,
-            format: InputImageFormat.nv21,
+            format: InputImageFormat.nv21, // SIEMPRE DEBE SER NV21
             bytesPerRow: planes[0].bytesPerRow,
           ),
         );
@@ -257,7 +247,7 @@ class FaceDetectionService {
         metadata: InputImageMetadata(
           size: Size(image.width.toDouble(), image.height.toDouble()),
           rotation: rotation,  
-          format: InputImageFormat.nv21,
+          format: InputImageFormat.nv21, // SIEMPRE DEBE SER NV21
           bytesPerRow: planes[0].bytesPerRow,
         ),
       );
@@ -274,11 +264,11 @@ class FaceDetectionService {
     }
   }
 
-  // NUEVA FUNCIÓN: Usa _convertCameraImage para leer QR
   Future<String?> scanQR(CameraImage image, {CameraLensDirection direction = CameraLensDirection.front}) async {
     try {
       if (!_isInitialized) return null;
       
+      // Llamamos a tu conversor manual que no arroja error
       final inputImage = _convertCameraImage(image, direction: direction);
       final barcodes = await _barcodeScanner.processImage(inputImage);
       
@@ -298,7 +288,6 @@ class FaceDetectionService {
     final stopwatch = Stopwatch()..start();
 
     try {
-      // Sistema anti-caídas: Valida que estemos contrastando 9D vs 9D.
       if (currentEmbedding.isEmpty || enrolledEmbedding.isEmpty || currentEmbedding.length != enrolledEmbedding.length) {
         stopwatch.stop();
         return FaceRecognitionResult(
@@ -316,7 +305,6 @@ class FaceDetectionService {
       }
       double euclideanDistance = sqrt(sum);
 
-      // PUNTO DULCE: Umbral calibrado a 0.22 con Vector de 9 Dimensiones.
       const double threshold = 0.22;
       bool isMatched = euclideanDistance < threshold;
 
@@ -361,7 +349,7 @@ class FaceDetectionService {
   Future<void> dispose() async {
     if (_isInitialized) {
       await _faceDetector.close();
-      await _barcodeScanner.close(); // Limpieza del QR Scanner añadida
+      await _barcodeScanner.close(); 
       _isInitialized = false;
       _logger.i('FaceDetector liberado');
     }

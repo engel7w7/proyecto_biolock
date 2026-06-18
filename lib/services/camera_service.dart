@@ -71,8 +71,9 @@ class CameraService {
       print('[CameraService] Step 3: Creating NEW controller for camera ${selectedCamera.name}');
       _controller = CameraController(
         selectedCamera,
-        ResolutionPreset.medium,
+        ResolutionPreset.high, // CAMBIO CRÍTICO AQUI: De medium a high para que el QR sea nítido
         enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.yuv420, // CAMBIO CRÍTICO AQUÍ: Fuerza formato compatible con ML Kit
       );
 
       print('[CameraService] Step 4: Calling initialize (TIMEOUT 15s)');

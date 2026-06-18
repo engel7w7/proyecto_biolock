@@ -368,7 +368,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
         centerTitle: true,
         backgroundColor: const Color(0xFF6A3E7A),
         actions: [
-          // BOTON AÑADIDO PARA LA INTERFAZ (Mantiene el resto de tu app intacta)
+          // BOTON DE LA INTERFAZ AGREGADO
           if (_isInitialized && !_cameraFailed)
             IconButton(
               icon: Icon(
