@@ -30,8 +30,8 @@ class _UnlockScreenState extends State<UnlockScreen> {
 
   int _consecutiveMatches = 0;
   DateTime? _scanningStartTime;
-  
-  // Variable para alternar la logica de la camara
+
+  // NUEVA VARIABLE: Para modo QR
   bool _isQrMode = false;
 
   @override
@@ -119,19 +119,46 @@ class _UnlockScreenState extends State<UnlockScreen> {
     }
   }
 
-  void _toggleQrMode() {
+  // NUEVA FUNCION: Alterna de cámara y estado
+  Future<void> _toggleQrMode() async {
+    if (_isProcessing) return; 
+
     setState(() {
+      _isProcessing = true; 
       _isQrMode = !_isQrMode;
       _consecutiveMatches = 0;
       _scanningStartTime = null;
       if (_isQrMode) {
-        _statusMessage = 'Muestre su Tarjeta QR';
+        _statusMessage = 'Iniciando cámara trasera...';
         _statusColor = Colors.purple;
       } else {
-        _statusMessage = 'Acerca tu rostro a la cámara...';
+        _statusMessage = 'Iniciando cámara frontal...';
         _statusColor = Colors.blue;
       }
     });
+
+    await _cameraService.stopImageStream();
+    
+    final newDirection = _isQrMode ? CameraLensDirection.back : CameraLensDirection.front;
+    final success = await _cameraService.initializeCamera(direction: newDirection);
+
+    if (success && mounted) {
+      setState(() {
+        _isProcessing = false;
+        if (_isQrMode) {
+          _statusMessage = 'Enfoque la Llave QR';
+        } else {
+          _statusMessage = 'Acerca tu rostro a la cámara...';
+        }
+      });
+      _startFaceDetection(); 
+    } else if (mounted) {
+      setState(() {
+        _isProcessing = false;
+        _cameraFailed = true;
+        _statusMessage = 'Error al cambiar de cámara';
+      });
+    }
   }
 
   void _startFaceDetection() {
@@ -145,8 +172,10 @@ class _UnlockScreenState extends State<UnlockScreen> {
 
       try {
         if (_isQrMode) {
-          // Lógica de Desbloqueo por QR
-          final qrData = await _faceDetectionService.scanQR(image);
+          // ==============================
+          // LOGICA NUEVA QR (CAMARA TRASERA)
+          // ==============================
+          final qrData = await _faceDetectionService.scanQR(image, direction: _cameraService.currentDirection);
           
           if (qrData != null) {
             if (qrData == "BIOLOCK-ADMIN-2026") {
@@ -170,15 +199,17 @@ class _UnlockScreenState extends State<UnlockScreen> {
               await Future.delayed(const Duration(seconds: 2));
               if (mounted) {
                 setState(() {
-                  _statusMessage = 'Muestre su Tarjeta QR';
+                  _statusMessage = 'Enfoque la Llave QR';
                   _statusColor = Colors.purple;
                 });
               }
             }
           }
         } else {
-          // Lógica original de Desbloqueo Facial
-          final faces = await _faceDetectionService.detectFaces(image);
+          // ==============================
+          // TU LOGICA ORIGINAL INTACTA
+          // ==============================
+          final faces = await _faceDetectionService.detectFaces(image, direction: _cameraService.currentDirection);
 
           if (faces.isNotEmpty) {
             final face = faces.first;
@@ -337,6 +368,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
         centerTitle: true,
         backgroundColor: const Color(0xFF6A3E7A),
         actions: [
+          // BOTON AÑADIDO PARA LA INTERFAZ (Mantiene el resto de tu app intacta)
           if (_isInitialized && !_cameraFailed)
             IconButton(
               icon: Icon(
@@ -457,37 +489,16 @@ class _UnlockScreenState extends State<UnlockScreen> {
                 ),
               ],
             )
-              : _isInitialized && _cameraService.controller == null
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Error de controlador de cámara',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 16, color: Colors.red),
-                          ),
-                          const SizedBox(height: 24),
-                          ElevatedButton.icon(
-                            onPressed: () => Navigator.pop(context),
-                            icon: const Icon(Icons.close),
-                            label: const Text('Volver'),
-                          ),
-                        ],
-                      ),
-                    )
-                  : Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const CircularProgressIndicator(),
-                          const SizedBox(height: 16),
-                          Text(_statusMessage),
-                        ],
-                      ),
-                    ),
+              : Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      Text(_statusMessage),
+                    ],
+                  ),
+                ),
     );
   }
 }

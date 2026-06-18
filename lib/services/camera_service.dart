@@ -8,11 +8,18 @@ class CameraService {
   CameraController? _controller;
   List<CameraDescription>? _cameras;
 
+  // NUEVA VARIABLE: Para saber qué cámara estamos usando actualmente (Frontal o Trasera)
+  CameraLensDirection _currentDirection = CameraLensDirection.front;
+
   bool get isInitialized => _controller != null && _controller!.value.isInitialized;
   CameraController? get controller => _controller;
+  
+  // NUEVO GETTER: Permite a otros servicios saber la orientación de la cámara
+  CameraLensDirection get currentDirection => _currentDirection;
 
   /// Inicializa la cámara
-  Future<bool> initializeCamera() async {
+  // MODIFICADO: Ahora acepta la dirección de la lente por parámetro (Frontal por defecto)
+  Future<bool> initializeCamera({CameraLensDirection direction = CameraLensDirection.front}) async {
     try {
       // Limpiar controlador anterior si existe
       print('[CameraService] Cleaning up previous controller...');
@@ -41,24 +48,29 @@ class CameraService {
         return false;
       }
       
-      // Buscar cámara frontal
-      CameraDescription? frontCamera;
+      // Actualizamos nuestra variable de control interno
+      _currentDirection = direction;
+
+      // Buscar la cámara solicitada (Frontal o Trasera según el parámetro)
+      CameraDescription? selectedCamera;
       for (var camera in _cameras!) {
         print('[CameraService] Camera: ${camera.name}, Lens: ${camera.lensDirection}');
-        if (camera.lensDirection == CameraLensDirection.front) {
-          frontCamera = camera;
+        if (camera.lensDirection == direction) {
+          selectedCamera = camera;
           break;
         }
       }
       
-      if (frontCamera == null) {
-        print('[CameraService] Front camera not found, using first available');
-        frontCamera = _cameras!.first;
+      // Contingencia por si el dispositivo no tiene la cámara solicitada
+      if (selectedCamera == null) {
+        print('[CameraService] Requested camera not found, using first available');
+        selectedCamera = _cameras!.first;
+        _currentDirection = selectedCamera.lensDirection; // Actualizamos a lo que realmente se usó
       }
 
-      print('[CameraService] Step 3: Creating NEW controller for camera ${frontCamera.name}');
+      print('[CameraService] Step 3: Creating NEW controller for camera ${selectedCamera.name}');
       _controller = CameraController(
-        frontCamera,
+        selectedCamera,
         ResolutionPreset.medium,
         enableAudio: false,
       );
@@ -105,8 +117,11 @@ class CameraService {
   /// Inicia la captura de frames
   void startImageStream(Function(CameraImage) onImageAvailable) {
     if (_controller != null && _controller!.value.isInitialized) {
-      _controller!.startImageStream(onImageAvailable);
-      _logger.i('Stream de cámara iniciado');
+      // Validación extra para evitar "Camera is already streaming"
+      if (!_controller!.value.isStreamingImages) {
+        _controller!.startImageStream(onImageAvailable);
+        _logger.i('Stream de cámara iniciado');
+      }
     }
   }
 

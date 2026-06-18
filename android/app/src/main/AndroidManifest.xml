@@ -9,7 +9,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     
     <application
-        android:label="biolock_web"
+        android:label="Biolock"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -1,6 +1,6 @@
 {
-    "name": "biolock_web",
-    "short_name": "biolock_web",
+    "name": "Biolock",
+    "short_name": "Biolock",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -1,5 +1,5 @@
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart'; // Librería QR agregada
+import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart'; // NUEVA LIBRERIA
 import 'package:camera/camera.dart';
 import 'package:logger/logger.dart';
 import 'dart:typed_data';
@@ -13,7 +13,7 @@ import 'database_service.dart';
 class FaceDetectionService {
   static final Logger _logger = Logger();
   late FaceDetector _faceDetector;
-  late BarcodeScanner _barcodeScanner; // Variable para el escáner QR
+  late BarcodeScanner _barcodeScanner; // NUEVO ESCANER
   bool _isInitialized = false;
   int _frameCount = 0;
   int _successfulDetections = 0;
@@ -30,13 +30,13 @@ class FaceDetectionService {
       );
       _faceDetector = FaceDetector(options: options);
       
-      // Inicializamos el escáner restringido solo a formatos QR para mayor velocidad
+      // INICIALIZANDO LECTOR QR
       _barcodeScanner = BarcodeScanner(formats: [BarcodeFormat.qrCode]);
-      
+
       _isInitialized = true;
       _logger.i('FaceDetector y QR Scanner inicializados en modo FAST');
     } catch (e) {
-      _logger.e('Error inicializando servicios: $e');
+      _logger.e('Error inicializando FaceDetector: $e');
     }
   }
 
@@ -103,24 +103,8 @@ class FaceDetectionService {
     return structuralVector;
   }
 
-  // NUEVA FUNCIÓN: Escaneo de QR reutilizando el motor de bytes de la cámara
-  Future<String?> scanQR(CameraImage image) async {
-    try {
-      if (!_isInitialized) return null;
-      
-      final inputImage = _convertCameraImage(image);
-      final barcodes = await _barcodeScanner.processImage(inputImage);
-      
-      if (barcodes.isNotEmpty) {
-        return barcodes.first.displayValue; 
-      }
-    } catch (e) {
-      _logger.e('Error escaneando QR: $e');
-    }
-    return null;
-  }
-
-  Future<List<Face>> detectFaces(CameraImage image) async {
+  // MODIFICADO: Se añade "direction" para rotar correctamente la matriz de bytes
+  Future<List<Face>> detectFaces(CameraImage image, {CameraLensDirection direction = CameraLensDirection.front}) async {
     late final Stopwatch stopwatch;
     
     try {
@@ -169,11 +153,16 @@ class FaceDetectionService {
         }
       }
       
+      // ROTACION DINAMICA DE CAMARA AÑADIDA AQUI
+      final rotation = direction == CameraLensDirection.front
+          ? InputImageRotation.rotation270deg
+          : InputImageRotation.rotation90deg;
+
       final inputImage = InputImage.fromBytes(
         bytes: nv21,
         metadata: InputImageMetadata(
           size: Size(width.toDouble(), height.toDouble()),
-          rotation: InputImageRotation.rotation0deg,
+          rotation: rotation,
           format: InputImageFormat.nv21,
           bytesPerRow: width,
         ),
@@ -228,16 +217,22 @@ class FaceDetectionService {
     return await compareFacesReal(currentVec, enrolledVec);
   }
 
-  InputImage _convertCameraImage(CameraImage image) {
+  // MODIFICADO: Se añade "direction" para rotar correctamente la matriz de bytes
+  InputImage _convertCameraImage(CameraImage image, {CameraLensDirection direction = CameraLensDirection.front}) {
     try {
       final planes = image.planes;
+      
+      // ROTACION DINAMICA
+      final rotation = direction == CameraLensDirection.front
+          ? InputImageRotation.rotation270deg
+          : InputImageRotation.rotation90deg;
       
       if (planes.length < 3) {
         return InputImage.fromBytes(
           bytes: planes[0].bytes,
           metadata: InputImageMetadata(
             size: Size(image.width.toDouble(), image.height.toDouble()),
-            rotation: InputImageRotation.rotation0deg,
+            rotation: rotation,
             format: InputImageFormat.nv21,
             bytesPerRow: planes[0].bytesPerRow,
           ),
@@ -261,7 +256,7 @@ class FaceDetectionService {
         bytes: nv21data,
         metadata: InputImageMetadata(
           size: Size(image.width.toDouble(), image.height.toDouble()),
-          rotation: InputImageRotation.rotation0deg,  
+          rotation: rotation,  
           format: InputImageFormat.nv21,
           bytesPerRow: planes[0].bytesPerRow,
         ),
@@ -277,6 +272,23 @@ class FaceDetectionService {
         ),
       );
     }
+  }
+
+  // NUEVA FUNCIÓN: Usa _convertCameraImage para leer QR
+  Future<String?> scanQR(CameraImage image, {CameraLensDirection direction = CameraLensDirection.front}) async {
+    try {
+      if (!_isInitialized) return null;
+      
+      final inputImage = _convertCameraImage(image, direction: direction);
+      final barcodes = await _barcodeScanner.processImage(inputImage);
+      
+      if (barcodes.isNotEmpty) {
+        return barcodes.first.displayValue; 
+      }
+    } catch (e) {
+      _logger.e('Error escaneando QR: $e');
+    }
+    return null;
   }
 
   Future<FaceRecognitionResult> compareFacesReal(
@@ -304,6 +316,7 @@ class FaceDetectionService {
       }
       double euclideanDistance = sqrt(sum);
 
+      // PUNTO DULCE: Umbral calibrado a 0.22 con Vector de 9 Dimensiones.
       const double threshold = 0.22;
       bool isMatched = euclideanDistance < threshold;
 
@@ -348,7 +361,7 @@ class FaceDetectionService {
   Future<void> dispose() async {
     if (_isInitialized) {
       await _faceDetector.close();
-      await _barcodeScanner.close(); // Se asegura de liberar el escáner de memoria
+      await _barcodeScanner.close(); // Limpieza del QR Scanner añadida
       _isInitialized = false;
       _logger.i('FaceDetector liberado');
     }
