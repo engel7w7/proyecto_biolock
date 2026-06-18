@@ -1,4 +1,5 @@
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart'; // Librería QR agregada
 import 'package:camera/camera.dart';
 import 'package:logger/logger.dart';
 import 'dart:typed_data';
@@ -12,6 +13,7 @@ import 'database_service.dart';
 class FaceDetectionService {
   static final Logger _logger = Logger();
   late FaceDetector _faceDetector;
+  late BarcodeScanner _barcodeScanner; // Variable para el escáner QR
   bool _isInitialized = false;
   int _frameCount = 0;
   int _successfulDetections = 0;
@@ -27,10 +29,14 @@ class FaceDetectionService {
         performanceMode: FaceDetectorMode.fast, 
       );
       _faceDetector = FaceDetector(options: options);
+      
+      // Inicializamos el escáner restringido solo a formatos QR para mayor velocidad
+      _barcodeScanner = BarcodeScanner(formats: [BarcodeFormat.qrCode]);
+      
       _isInitialized = true;
-      _logger.i('FaceDetector inicializado en modo FAST');
+      _logger.i('FaceDetector y QR Scanner inicializados en modo FAST');
     } catch (e) {
-      _logger.e('Error inicializando FaceDetector: $e');
+      _logger.e('Error inicializando servicios: $e');
     }
   }
 
@@ -95,6 +101,23 @@ class FaceDetectionService {
     structuralVector.add(distanceBetween(nose, rightCheek) / interPupillaryDistance);
 
     return structuralVector;
+  }
+
+  // NUEVA FUNCIÓN: Escaneo de QR reutilizando el motor de bytes de la cámara
+  Future<String?> scanQR(CameraImage image) async {
+    try {
+      if (!_isInitialized) return null;
+      
+      final inputImage = _convertCameraImage(image);
+      final barcodes = await _barcodeScanner.processImage(inputImage);
+      
+      if (barcodes.isNotEmpty) {
+        return barcodes.first.displayValue; 
+      }
+    } catch (e) {
+      _logger.e('Error escaneando QR: $e');
+    }
+    return null;
   }
 
   Future<List<Face>> detectFaces(CameraImage image) async {
@@ -281,8 +304,6 @@ class FaceDetectionService {
       }
       double euclideanDistance = sqrt(sum);
 
-      // PUNTO DULCE: Umbral calibrado a 0.22 con Vector de 9 Dimensiones.
-      // Suficiente para ti, impenetrable para tus hermanos.
       const double threshold = 0.22;
       bool isMatched = euclideanDistance < threshold;
 
@@ -327,6 +348,7 @@ class FaceDetectionService {
   Future<void> dispose() async {
     if (_isInitialized) {
       await _faceDetector.close();
+      await _barcodeScanner.close(); // Se asegura de liberar el escáner de memoria
       _isInitialized = false;
       _logger.i('FaceDetector liberado');
     }

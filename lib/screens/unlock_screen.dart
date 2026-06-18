@@ -30,6 +30,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
 
   int _consecutiveMatches = 0;
   DateTime? _scanningStartTime;
+  
+  // Variable para alternar la logica de la camara
+  bool _isQrMode = false;
 
   @override
   void initState() {
@@ -116,6 +119,21 @@ class _UnlockScreenState extends State<UnlockScreen> {
     }
   }
 
+  void _toggleQrMode() {
+    setState(() {
+      _isQrMode = !_isQrMode;
+      _consecutiveMatches = 0;
+      _scanningStartTime = null;
+      if (_isQrMode) {
+        _statusMessage = 'Muestre su Tarjeta QR';
+        _statusColor = Colors.purple;
+      } else {
+        _statusMessage = 'Acerca tu rostro a la cámara...';
+        _statusColor = Colors.blue;
+      }
+    });
+  }
+
   void _startFaceDetection() {
     _consecutiveMatches = 0;
     _scanningStartTime = null;
@@ -126,22 +144,25 @@ class _UnlockScreenState extends State<UnlockScreen> {
       _isProcessing = true;
 
       try {
-        final faces = await _faceDetectionService.detectFaces(image);
-
-        if (faces.isNotEmpty) {
-          final face = faces.first;
-
-          _scanningStartTime ??= DateTime.now();
-
-          if (!_faceDetectionService.isHeadAligned(face)) {
-            final int millis = DateTime.now().difference(_scanningStartTime!).inMilliseconds;
-            final double secs = millis / 1000.0;
-            
-            if (secs >= 3.0) {
-              _scanningStartTime = null;
+        if (_isQrMode) {
+          // Lógica de Desbloqueo por QR
+          final qrData = await _faceDetectionService.scanQR(image);
+          
+          if (qrData != null) {
+            if (qrData == "BIOLOCK-ADMIN-2026") {
               if (mounted) {
                 setState(() {
-                  _statusMessage = 'Escaneo fallido por posicion';
+                  _statusMessage = 'Llave QR Autorizada';
+                  _statusColor = Colors.green;
+                });
+              }
+              await _bluetoothService.openLock();
+              await Future.delayed(const Duration(seconds: 2));
+              if (mounted) Navigator.pop(context, true);
+            } else {
+              if (mounted) {
+                setState(() {
+                  _statusMessage = 'Código QR Inválido';
                   _statusColor = Colors.red;
                 });
               }
@@ -149,63 +170,35 @@ class _UnlockScreenState extends State<UnlockScreen> {
               await Future.delayed(const Duration(seconds: 2));
               if (mounted) {
                 setState(() {
-                  _statusMessage = 'Acerca tu rostro a la camara...';
-                  _statusColor = Colors.blue;
-                });
-              }
-            } else {
-              if (mounted) {
-                setState(() {
-                  _statusMessage = 'Mira de frente... (${secs.toStringAsFixed(1)}s/3s)';
-                  _statusColor = Colors.orange;
+                  _statusMessage = 'Muestre su Tarjeta QR';
+                  _statusColor = Colors.purple;
                 });
               }
             }
-            _isProcessing = false;
-            return; 
           }
+        } else {
+          // Lógica original de Desbloqueo Facial
+          final faces = await _faceDetectionService.detectFaces(image);
 
-          final result = await _authService.authenticateWithFace(face);
+          if (faces.isNotEmpty) {
+            final face = faces.first;
 
-          if (mounted) {
-            if (result.isMatched) {
-              _consecutiveMatches++;
-              
-              if (_consecutiveMatches >= 2) {
-                _scanningStartTime = null; 
-                setState(() {
-                  _statusMessage = 'Acceso Concedido';
-                  _statusColor = Colors.green;
-                });
+            _scanningStartTime ??= DateTime.now();
 
-                await _bluetoothService.openLock();
-                await Future.delayed(const Duration(seconds: 2));
-
-                if (mounted) {
-                  Navigator.pop(context, true);
-                }
-              } else {
-                setState(() {
-                  _statusMessage = 'Estabilizando firma...';
-                  _statusColor = Colors.blue;
-                });
-              }
-            } else {
-              _consecutiveMatches = 0; 
-              
+            if (!_faceDetectionService.isHeadAligned(face)) {
               final int millis = DateTime.now().difference(_scanningStartTime!).inMilliseconds;
               final double secs = millis / 1000.0;
-
+              
               if (secs >= 3.0) {
                 _scanningStartTime = null;
-                setState(() {
-                  _statusMessage = 'Rostro no reconocido';
-                  _statusColor = Colors.red;
-                });
-
+                if (mounted) {
+                  setState(() {
+                    _statusMessage = 'Escaneo fallido por posicion';
+                    _statusColor = Colors.red;
+                  });
+                }
                 await _bluetoothService.rejectAccess();
                 await Future.delayed(const Duration(seconds: 2));
-
                 if (mounted) {
                   setState(() {
                     _statusMessage = 'Acerca tu rostro a la camara...';
@@ -213,42 +206,102 @@ class _UnlockScreenState extends State<UnlockScreen> {
                   });
                 }
               } else {
-                setState(() {
-                  _statusMessage = 'Analizando... (${secs.toStringAsFixed(1)}s/3s)';
-                  _statusColor = Colors.blue;
-                });
+                if (mounted) {
+                  setState(() {
+                    _statusMessage = 'Mira de frente... (${secs.toStringAsFixed(1)}s/3s)';
+                    _statusColor = Colors.orange;
+                  });
+                }
+              }
+              _isProcessing = false;
+              return; 
+            }
+
+            final result = await _authService.authenticateWithFace(face);
+
+            if (mounted) {
+              if (result.isMatched) {
+                _consecutiveMatches++;
+                
+                if (_consecutiveMatches >= 2) {
+                  _scanningStartTime = null; 
+                  setState(() {
+                    _statusMessage = 'Acceso Concedido';
+                    _statusColor = Colors.green;
+                  });
+
+                  await _bluetoothService.openLock();
+                  await Future.delayed(const Duration(seconds: 2));
+
+                  if (mounted) {
+                    Navigator.pop(context, true);
+                  }
+                } else {
+                  setState(() {
+                    _statusMessage = 'Estabilizando firma...';
+                    _statusColor = Colors.blue;
+                  });
+                }
+              } else {
+                _consecutiveMatches = 0; 
+                
+                final int millis = DateTime.now().difference(_scanningStartTime!).inMilliseconds;
+                final double secs = millis / 1000.0;
+
+                if (secs >= 3.0) {
+                  _scanningStartTime = null;
+                  setState(() {
+                    _statusMessage = 'Rostro no reconocido';
+                    _statusColor = Colors.red;
+                  });
+
+                  await _bluetoothService.rejectAccess();
+                  await Future.delayed(const Duration(seconds: 2));
+
+                  if (mounted) {
+                    setState(() {
+                      _statusMessage = 'Acerca tu rostro a la camara...';
+                      _statusColor = Colors.blue;
+                    });
+                  }
+                } else {
+                  setState(() {
+                    _statusMessage = 'Analizando... (${secs.toStringAsFixed(1)}s/3s)';
+                    _statusColor = Colors.blue;
+                  });
+                }
               }
             }
-          }
-        } else {
-          _consecutiveMatches = 0;
-          
-          if (_scanningStartTime != null) {
-            final int millis = DateTime.now().difference(_scanningStartTime!).inMilliseconds;
-            final double secs = millis / 1000.0;
+          } else {
+            _consecutiveMatches = 0;
             
-            if (secs >= 3.0) {
-              _scanningStartTime = null; 
+            if (_scanningStartTime != null) {
+              final int millis = DateTime.now().difference(_scanningStartTime!).inMilliseconds;
+              final double secs = millis / 1000.0;
+              
+              if (secs >= 3.0) {
+                _scanningStartTime = null; 
+                if (mounted && _statusColor != Colors.blue) {
+                  setState(() {
+                    _statusMessage = 'Acerca tu rostro a la camara...';
+                    _statusColor = Colors.blue;
+                  });
+                }
+              } else {
+                if (mounted) {
+                  setState(() {
+                    _statusMessage = 'No te muevas... (${secs.toStringAsFixed(1)}s/3s)';
+                    _statusColor = Colors.orange;
+                  });
+                }
+              }
+            } else {
               if (mounted && _statusColor != Colors.blue) {
                 setState(() {
                   _statusMessage = 'Acerca tu rostro a la camara...';
                   _statusColor = Colors.blue;
                 });
               }
-            } else {
-              if (mounted) {
-                setState(() {
-                  _statusMessage = 'No te muevas... (${secs.toStringAsFixed(1)}s/3s)';
-                  _statusColor = Colors.orange;
-                });
-              }
-            }
-          } else {
-            if (mounted && _statusColor != Colors.blue) {
-              setState(() {
-                _statusMessage = 'Acerca tu rostro a la camara...';
-                _statusColor = Colors.blue;
-              });
             }
           }
         }
@@ -283,6 +336,17 @@ class _UnlockScreenState extends State<UnlockScreen> {
         title: const Text('Desbloquear'),
         centerTitle: true,
         backgroundColor: const Color(0xFF6A3E7A),
+        actions: [
+          if (_isInitialized && !_cameraFailed)
+            IconButton(
+              icon: Icon(
+                _isQrMode ? Icons.face : Icons.qr_code_scanner,
+                color: Colors.white,
+              ),
+              tooltip: _isQrMode ? 'Volver a Rostro' : 'Modo QR',
+              onPressed: _toggleQrMode,
+            ),
+        ],
       ),
       body: _cameraFailed
           ? Center(
@@ -356,7 +420,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
                                     ? Icons.check_circle
                                     : _statusColor == Colors.red
                                         ? Icons.cancel
-                                        : Icons.info,
+                                        : _isQrMode
+                                            ? Icons.qr_code
+                                            : Icons.info,
                                 color: _statusColor,
                                 size: 32,
                               ),
